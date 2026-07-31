@@ -40,15 +40,15 @@ services:
       - key: STRIPE_PRODUCT_TAX_CODE
         value: txcd_40060003
       - key: BUSINESS_ADDRESS_LINE1
-        sync: false
+        value: "10457 Lanesboro Rd"
       - key: BUSINESS_ADDRESS_LINE2
         sync: false
       - key: BUSINESS_CITY
-        sync: false
+        value: Scranton
       - key: BUSINESS_STATE
-        sync: false
+        value: ND
       - key: BUSINESS_ZIP
-        sync: false
+        value: "58653"
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, startTransition } from "react";
 import {
   estimateTaxAction,
   type TaxEstimateState,
@@ -28,7 +28,7 @@ export function TaxEstimatePanel({
   subtotalCents: number;
   discountCents?: number;
 }) {
-  const [estimate, formAction, pending] = useActionState(
+  const [estimate, runEstimate, pending] = useActionState(
     estimateTaxAction,
     initialState,
   );
@@ -44,6 +44,21 @@ export function TaxEstimatePanel({
   const totalCents = estimate.totalCents ?? null;
   const afterDiscount = Math.max(0, subtotalCents - discountCents);
 
+  function handleEstimate() {
+    if (!canEstimate || pending) return;
+    const fd = new FormData();
+    fd.set("fulfillmentType", fulfillmentType);
+    fd.set("addressLine1", addressLine1);
+    fd.set("addressLine2", addressLine2);
+    fd.set("city", city);
+    fd.set("state", state);
+    fd.set("zip", zip);
+    // Nested <form> inside checkout is invalid HTML — call the action directly
+    startTransition(() => {
+      runEstimate(fd);
+    });
+  }
+
   return (
     <div className="rounded-xl border border-charcoal/10 bg-cream/50 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -54,21 +69,14 @@ export function TaxEstimatePanel({
             (state &amp; county)
           </p>
         </div>
-        <form action={formAction}>
-          <input type="hidden" name="fulfillmentType" value={fulfillmentType} />
-          <input type="hidden" name="addressLine1" value={addressLine1} />
-          <input type="hidden" name="addressLine2" value={addressLine2} />
-          <input type="hidden" name="city" value={city} />
-          <input type="hidden" name="state" value={state} />
-          <input type="hidden" name="zip" value={zip} />
-          <button
-            type="submit"
-            disabled={pending || !canEstimate}
-            className="rounded-full border border-charcoal/15 px-3 py-1.5 text-xs font-medium text-charcoal hover:border-copper hover:text-copper disabled:opacity-50"
-          >
-            {pending ? "Calculating…" : "Estimate tax"}
-          </button>
-        </form>
+        <button
+          type="button"
+          onClick={handleEstimate}
+          disabled={pending || !canEstimate}
+          className="rounded-full border border-charcoal/15 px-3 py-1.5 text-xs font-medium text-charcoal hover:border-copper hover:text-copper disabled:opacity-50"
+        >
+          {pending ? "Calculating…" : "Estimate tax"}
+        </button>
       </div>
 
       <div className="mt-3 space-y-1 text-sm">
