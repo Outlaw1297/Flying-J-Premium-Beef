@@ -27,6 +27,12 @@ enum FulfillmentType {
   DELIVERY
 }
 
+enum PaymentMethod {
+  CARD
+  CASH
+  CHECK
+}
+
 enum CouponType {
   PERCENT
   FIXED
@@ -111,6 +117,7 @@ model Order {
   taxCents              Int             @default(0) @map("tax_cents")
   totalCents            Int             @map("total_cents")
   fulfillmentType       FulfillmentType @default(PICKUP) @map("fulfillment_type")
+  paymentMethod         PaymentMethod   @default(CARD) @map("payment_method")
   pickupDate            DateTime?       @map("pickup_date")
   notes                 String?
   couponId              String?         @map("coupon_id")

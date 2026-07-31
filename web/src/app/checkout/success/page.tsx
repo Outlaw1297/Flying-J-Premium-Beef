@@ -5,32 +5,35 @@ import { formatCents } from "@/lib/format";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { fulfillCheckoutSession } from "@/lib/orders";
+import { auth } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Order confirmed",
 };
 
 type SuccessPageProps = {
-  searchParams: Promise<{ session_id?: string }>;
+  searchParams: Promise<{ session_id?: string; order_id?: string }>;
 };
 
 export default async function CheckoutSuccessPage({
   searchParams,
 }: SuccessPageProps) {
-  const { session_id: sessionId } = await searchParams;
+  const { session_id: sessionId, order_id: orderIdParam } = await searchParams;
+  const session = await auth();
 
   let invoiceNumber: string | null = null;
   let totalCents: number | null = null;
   let orderId: string | null = null;
+  let paymentMethod: string | null = null;
+  let paidOnline = false;
 
   if (sessionId && process.env.STRIPE_SECRET_KEY) {
     try {
       const stripe = getStripe();
-      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);
 
-      // Fallback if webhook hasn't run yet (common on free tier cold starts)
-      if (session.payment_status === "paid") {
-        await fulfillCheckoutSession(session);
+      if (checkoutSession.payment_status === "paid") {
+        await fulfillCheckoutSession(checkoutSession);
       }
 
       const order = await prisma.order.findFirst({
@@ -42,24 +45,49 @@ export default async function CheckoutSuccessPage({
         orderId = order.id;
         totalCents = order.totalCents;
         invoiceNumber = order.invoice?.invoiceNumber ?? null;
+        paymentMethod = order.paymentMethod;
+        paidOnline = order.status === "PAID";
       }
     } catch (error) {
       console.error("Success page session lookup failed:", error);
     }
+  } else if (orderIdParam && session?.user?.id) {
+    const order = await prisma.order.findFirst({
+      where: { id: orderIdParam, userId: session.user.id },
+      include: { invoice: true },
+    });
+
+    if (order) {
+      orderId = order.id;
+      totalCents = order.totalCents;
+      invoiceNumber = order.invoice?.invoiceNumber ?? null;
+      paymentMethod = order.paymentMethod;
+      paidOnline = order.status === "PAID";
+    }
   }
+
+  const isOfflinePay =
+    paymentMethod === "CASH" || paymentMethod === "CHECK";
 
   return (
     <div className="mx-auto max-w-lg px-4 py-16 sm:px-6 sm:py-20 text-center">
       <ClearCartOnSuccess />
       <p className="text-sm font-semibold uppercase tracking-wider text-copper">
-        Payment received
+        {paidOnline
+          ? "Payment received"
+          : isOfflinePay
+            ? "Order placed"
+            : "Thank you"}
       </p>
       <h1 className="mt-3 font-display text-3xl font-semibold text-charcoal sm:text-4xl">
         Thank you for your order
       </h1>
       <p className="mt-4 text-charcoal/70 leading-relaxed">
-        We&apos;ll prepare your Flying J Premium Beef and notify you when it&apos;s
-        ready for pickup or delivery.
+        {isOfflinePay
+          ? `We'll prepare your Flying J Premium Beef. Please bring ${
+              paymentMethod === "CHECK" ? "a check" : "cash"
+            } when you pick up or receive delivery.`
+          : "We'll prepare your Flying J Premium Beef and notify you when it's ready for pickup or delivery."}
       </p>
 
       {(invoiceNumber || totalCents !== null) && (
@@ -76,6 +104,12 @@ export default async function CheckoutSuccessPage({
               <span className="font-semibold text-charcoal">
                 {formatCents(totalCents)}
               </span>
+            </p>
+          )}
+          {isOfflinePay && (
+            <p className="mt-2 text-sm font-medium text-copper">
+              Due at pickup / delivery —{" "}
+              {paymentMethod === "CHECK" ? "check" : "cash"}
             </p>
           )}
         </div>

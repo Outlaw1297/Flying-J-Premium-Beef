@@ -4,3 +4,10 @@ export function formatCents(cents: number): string {
     currency: "USD",
   }).format(cents / 100);
 }
+
+export {
+  formatPhoneDisplay,
+  formatPhoneInput,
+  normalizeUsPhone,
+} from "@/lib/phone";
+
