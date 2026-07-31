@@ -6,7 +6,13 @@ import { PRODUCT_CATEGORIES } from "@/lib/categories";
 
 export const metadata: Metadata = {
   title: "Shop",
-  description: "Browse locally raised premium beef — steaks, ground, roasts, and bundles.",
+  description:
+    "Browse locally raised premium beef — steaks, ground, roasts, and bundles. Federally inspected. Order online for pickup or delivery near Scranton, ND.",
+  openGraph: {
+    title: "Shop | Flying J Premium Beef",
+    description:
+      "Steaks, ground beef, roasts, and bundles from Flying J Premium Beef.",
+  },
 };
 
 type ShopPageProps = {
