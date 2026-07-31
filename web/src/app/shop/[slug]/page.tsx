@@ -52,15 +52,31 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
       <div className="mt-6 grid gap-10 lg:grid-cols-2">
         <div
-          className={`flex min-h-72 items-end rounded-2xl bg-gradient-to-br p-6 ${gradient}`}
+          className={`relative flex min-h-72 items-end overflow-hidden rounded-2xl bg-gradient-to-br p-6 ${gradient}`}
         >
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wider text-cream/70">
+          {product.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : null}
+          <div className="relative z-10">
+            <p
+              className={`text-sm font-semibold uppercase tracking-wider ${
+                product.imageUrl
+                  ? "inline-block rounded bg-charcoal/70 px-2 py-1 text-cream"
+                  : "text-cream/70"
+              }`}
+            >
               {categoryLabel(product.category)}
             </p>
-            <p className="mt-2 font-display text-3xl font-semibold text-cream">
-              {product.name}
-            </p>
+            {!product.imageUrl && (
+              <p className="mt-2 font-display text-3xl font-semibold text-cream">
+                {product.name}
+              </p>
+            )}
           </div>
         </div>
 

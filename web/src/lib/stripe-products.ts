@@ -1,6 +1,7 @@
 import { getStripe } from "@/lib/stripe";
 import { productTaxCode } from "@/lib/tax";
 import { prisma } from "@/lib/prisma";
+import { isHttpImageUrl } from "@/lib/product-images";
 import type { Product } from "@/generated/prisma/client";
 
 type SyncableProduct = Pick<
@@ -34,11 +35,15 @@ export async function syncProductToStripe(
 
   let stripeProductId = product.stripeProductId;
 
+  const stripeImages = isHttpImageUrl(product.imageUrl)
+    ? [product.imageUrl!]
+    : undefined;
+
   if (stripeProductId) {
     await stripe.products.update(stripeProductId, {
       name: product.name,
       description: product.description || undefined,
-      images: product.imageUrl ? [product.imageUrl] : undefined,
+      images: stripeImages,
       active: product.active,
       tax_code: taxCode,
       metadata: {
@@ -52,7 +57,7 @@ export async function syncProductToStripe(
     const created = await stripe.products.create({
       name: product.name,
       description: product.description || undefined,
-      images: product.imageUrl ? [product.imageUrl] : undefined,
+      images: stripeImages,
       active: product.active,
       tax_code: taxCode,
       metadata: {

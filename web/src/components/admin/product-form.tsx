@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   upsertProductAction,
   type AdminFormState,
@@ -31,9 +31,10 @@ export function ProductForm({
     upsertProductAction,
     initialState,
   );
+  const [preview, setPreview] = useState<string | null>(product?.imageUrl ?? null);
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form action={formAction} encType="multipart/form-data" className="space-y-5">
       {product ? <input type="hidden" name="id" value={product.id} /> : null}
       {state.error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -53,19 +54,11 @@ export function ProductForm({
             defaultValue={product?.name ?? ""}
             className={inputClass}
           />
+          <p className="mt-1 text-xs text-charcoal/50">
+            Shop URL is created automatically from the name.
+          </p>
         </div>
-        <div>
-          <label htmlFor="slug" className="block text-sm font-medium text-charcoal">
-            Slug
-          </label>
-          <input
-            id="slug"
-            name="slug"
-            defaultValue={product?.slug ?? ""}
-            placeholder="auto from name"
-            className={inputClass}
-          />
-        </div>
+
         <div>
           <label htmlFor="category" className="block text-sm font-medium text-charcoal">
             Category
@@ -121,18 +114,41 @@ export function ProductForm({
             className={inputClass}
           />
         </div>
-        <div>
-          <label htmlFor="imageUrl" className="block text-sm font-medium text-charcoal">
-            Image URL
+
+        <div className="sm:col-span-2">
+          <label htmlFor="image" className="block text-sm font-medium text-charcoal">
+            Product photo
           </label>
+          {preview && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={preview}
+              alt="Product preview"
+              className="mt-2 h-40 w-full max-w-sm rounded-xl object-cover border border-charcoal/10"
+            />
+          )}
           <input
-            id="imageUrl"
-            name="imageUrl"
-            type="url"
-            defaultValue={product?.imageUrl ?? ""}
-            className={inputClass}
+            id="image"
+            name="image"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className={`${inputClass} file:mr-3 file:rounded-full file:border-0 file:bg-charcoal file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-cream`}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) {
+                setPreview(product?.imageUrl ?? null);
+                return;
+              }
+              const url = URL.createObjectURL(file);
+              setPreview(url);
+            }}
           />
+          <p className="mt-1 text-xs text-charcoal/50">
+            JPEG, PNG, or WebP up to 2.5 MB
+            {product?.imageUrl ? " · Leave empty to keep the current photo" : ""}.
+          </p>
         </div>
+
         <div className="sm:col-span-2">
           <label htmlFor="description" className="block text-sm font-medium text-charcoal">
             Description
