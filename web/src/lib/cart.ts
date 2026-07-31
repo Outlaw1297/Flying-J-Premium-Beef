@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import type { PricingMode } from "@/generated/prisma/client";
 
 export const CART_COOKIE = "fj-cart";
 const MAX_AGE = 60 * 60 * 24 * 7;
@@ -10,6 +11,8 @@ export type CartItem = {
   priceCents: number;
   weightLabel?: string | null;
   quantity: number;
+  pricingMode?: PricingMode;
+  estimatedLbs?: number | null;
 };
 
 export async function getCart(): Promise<CartItem[]> {
@@ -50,6 +53,18 @@ export async function getCartItemCount(): Promise<number> {
   return cart.reduce((sum, item) => sum + item.quantity, 0);
 }
 
+/** Estimated cart subtotal — hanging-weight lines use estimate lbs when available. */
 export function getCartSubtotal(items: CartItem[]): number {
-  return items.reduce((sum, item) => sum + item.priceCents * item.quantity, 0);
+  return items.reduce((sum, item) => {
+    if (item.pricingMode === "PER_POUND_HANGING") {
+      const lbs = (item.estimatedLbs ?? 0) * item.quantity;
+      if (lbs <= 0) return sum;
+      return sum + Math.round(lbs * item.priceCents);
+    }
+    return sum + item.priceCents * item.quantity;
+  }, 0);
+}
+
+export function cartHasHangingWeight(items: CartItem[]): boolean {
+  return items.some((item) => item.pricingMode === "PER_POUND_HANGING");
 }

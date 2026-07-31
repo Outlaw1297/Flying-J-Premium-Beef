@@ -117,11 +117,14 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
               ? "Card (Stripe)"
               : order.paymentMethod === "CHECK"
                 ? "Check at pickup / delivery"
-                : "Cash at pickup / delivery"}
+                : order.paymentMethod === "INVOICE"
+                  ? "Invoice (pay after weigh-in)"
+                  : "Cash at pickup / delivery"}
           </p>
           {order.invoice && (
             <p className="mt-1 text-sm text-charcoal/70">
               Invoice {order.invoice.invoiceNumber}
+              {order.invoice.status ? ` · ${order.invoice.status}` : ""}
             </p>
           )}
           {order.invoice?.issuedAt && (
@@ -134,8 +137,21 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
               })}
             </p>
           )}
+          {order.invoice && (
+            <p className="mt-3">
+              <Link
+                href={`/account/invoices/${order.invoice.id}`}
+                className="text-sm font-medium text-copper hover:underline"
+              >
+                View invoice
+                {order.invoice.status === "ISSUED" ? " & pay" : ""} →
+              </Link>
+            </p>
+          )}
           <p className="mt-3 text-lg font-semibold text-charcoal">
-            {formatCents(order.totalCents)}
+            {order.invoice?.status === "DRAFT"
+              ? "Total TBD"
+              : formatCents(order.totalCents)}
           </p>
         </div>
       </div>

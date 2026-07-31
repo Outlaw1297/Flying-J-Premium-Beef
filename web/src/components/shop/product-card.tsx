@@ -12,6 +12,7 @@ type ProductCardProps = {
   category: string | null;
   inventoryCount: number;
   imageUrl?: string | null;
+  pricingMode?: "FIXED" | "PER_POUND_HANGING" | null;
 };
 
 const categoryGradients: Record<string, string> = {
@@ -30,6 +31,7 @@ export function ProductCard({
   category,
   inventoryCount,
   imageUrl,
+  pricingMode,
 }: ProductCardProps) {
   const gradient =
     categoryGradients[category ?? ""] ?? "from-charcoal/80 to-copper/70";
@@ -75,6 +77,9 @@ export function ProductCard({
           <div>
             <p className="text-lg font-semibold text-charcoal">
               {formatCents(priceCents)}
+              {pricingMode === "PER_POUND_HANGING" ? (
+                <span className="text-sm font-normal text-charcoal/50"> / lb hanging</span>
+              ) : null}
             </p>
             {weightLabel && (
               <p className="text-xs text-charcoal/50">{weightLabel}</p>

@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin";
 const nav = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/invoices", label: "Invoices" },
   { href: "/admin/products", label: "Products" },
   { href: "/admin/support?status=active", label: "Support" },
   { href: "/admin/coupons", label: "Coupons" },

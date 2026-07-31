@@ -23,6 +23,7 @@ export function CheckoutForm({
   emailLocked = false,
   isGuestCheckout = false,
   newsletterDefault = true,
+  hasHangingWeight = false,
   subtotalCents,
   discountCents = 0,
 }: {
@@ -33,6 +34,7 @@ export function CheckoutForm({
   emailLocked?: boolean;
   isGuestCheckout?: boolean;
   newsletterDefault?: boolean;
+  hasHangingWeight?: boolean;
   subtotalCents: number;
   discountCents?: number;
   defaultAddress?: {
@@ -48,8 +50,8 @@ export function CheckoutForm({
     initialState,
   );
   const [phone, setPhone] = useState(formatPhoneDisplay(defaultPhone) || "");
-  const [paymentMethod, setPaymentMethod] = useState<"CARD" | "CASH" | "CHECK">(
-    "CARD",
+  const [paymentMethod, setPaymentMethod] = useState<"CARD" | "CASH" | "CHECK" | "INVOICE">(
+    hasHangingWeight ? "INVOICE" : "CARD",
   );
   const [fulfillmentType, setFulfillmentType] = useState<"PICKUP" | "DELIVERY">(
     defaultFulfillment === "DELIVERY" ? "DELIVERY" : "PICKUP",
@@ -64,8 +66,11 @@ export function CheckoutForm({
   const [addrState, setAddrState] = useState(defaultAddress?.state ?? "");
   const [zip, setZip] = useState(defaultAddress?.zip ?? "");
 
-  const submitLabel =
-    paymentMethod === "CARD"
+  const submitLabel = hasHangingWeight
+    ? pending
+      ? "Submitting order…"
+      : "Submit order — pay after weigh-in"
+    : paymentMethod === "CARD"
       ? pending
         ? "Redirecting to Stripe…"
         : "Pay securely with Stripe"
@@ -305,45 +310,57 @@ export function CheckoutForm({
 
       <fieldset>
         <legend className="text-sm font-medium text-charcoal">Payment</legend>
-        <div className="mt-3 space-y-3">
-          {(
-            [
-              {
-                value: "CARD" as const,
-                title: "Pay with card",
-                body: "Secure checkout with Stripe",
-              },
-              {
-                value: "CASH" as const,
-                title: "Cash at pickup / delivery",
-                body: "Pay when you receive your order",
-              },
-              {
-                value: "CHECK" as const,
-                title: "Check at pickup / delivery",
-                body: "Bring a check when you receive your order",
-              },
-            ] as const
-          ).map((option) => (
-            <label
-              key={option.value}
-              className="flex cursor-pointer items-start gap-3 rounded-xl border border-charcoal/15 bg-white p-4 has-[:checked]:border-copper has-[:checked]:ring-1 has-[:checked]:ring-copper"
-            >
-              <input
-                type="radio"
-                name="paymentMethod"
-                value={option.value}
-                checked={paymentMethod === option.value}
-                onChange={() => setPaymentMethod(option.value)}
-                className="mt-1"
-              />
-              <span>
-                <span className="block font-medium text-charcoal">{option.title}</span>
-                <span className="mt-0.5 block text-xs text-charcoal/60">{option.body}</span>
-              </span>
-            </label>
-          ))}
-        </div>
+        {hasHangingWeight ? (
+          <div className="mt-3 rounded-xl border border-copper/25 bg-copper/5 p-4 text-sm text-charcoal/80">
+            <input type="hidden" name="paymentMethod" value="INVOICE" />
+            <p className="font-medium text-charcoal">Pay after hanging weight</p>
+            <p className="mt-1 text-charcoal/70">
+              This cart includes a half/quarter (or other hanging-weight item).
+              We&apos;ll confirm the pounds, send your invoice, then you can pay
+              online or at pickup.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {(
+              [
+                {
+                  value: "CARD" as const,
+                  title: "Pay with card",
+                  body: "Secure checkout with Stripe",
+                },
+                {
+                  value: "CASH" as const,
+                  title: "Cash at pickup / delivery",
+                  body: "Pay when you receive your order",
+                },
+                {
+                  value: "CHECK" as const,
+                  title: "Check at pickup / delivery",
+                  body: "Bring a check when you receive your order",
+                },
+              ] as const
+            ).map((option) => (
+              <label
+                key={option.value}
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-charcoal/15 bg-white p-4 has-[:checked]:border-copper has-[:checked]:ring-1 has-[:checked]:ring-copper"
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value={option.value}
+                  checked={paymentMethod === option.value}
+                  onChange={() => setPaymentMethod(option.value)}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block font-medium text-charcoal">{option.title}</span>
+                  <span className="mt-0.5 block text-xs text-charcoal/60">{option.body}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
       </fieldset>
 
       <div>
@@ -359,16 +376,23 @@ export function CheckoutForm({
         />
       </div>
 
-      <TaxEstimatePanel
-        fulfillmentType={fulfillmentType}
-        addressLine1={addressLine1}
-        addressLine2={addressLine2}
-        city={city}
-        state={addrState}
-        zip={zip}
-        subtotalCents={subtotalCents}
-        discountCents={discountCents}
-      />
+      {!hasHangingWeight ? (
+        <TaxEstimatePanel
+          fulfillmentType={fulfillmentType}
+          addressLine1={addressLine1}
+          addressLine2={addressLine2}
+          city={city}
+          state={addrState}
+          zip={zip}
+          subtotalCents={subtotalCents}
+          discountCents={discountCents}
+        />
+      ) : (
+        <div className="rounded-xl border border-charcoal/10 bg-cream/50 p-4 text-sm text-charcoal/70">
+          Sales tax will be calculated on your final invoice after hanging weight
+          is confirmed.
+        </div>
+      )}
 
       <div>
         <label htmlFor="notes" className="block text-sm font-medium text-charcoal">

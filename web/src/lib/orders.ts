@@ -1,5 +1,11 @@
-import { nextInvoiceNumber } from "@/lib/invoices";
-import { sendOrderConfirmationEmail } from "@/lib/email";
+import {
+  buildInvoiceLinesFromCart,
+  nextInvoiceNumber,
+  recalculateInvoiceTotals,
+} from "@/lib/invoices";
+import {
+  sendOrderConfirmationEmail,
+} from "@/lib/email";
 import { recordCouponRedemption } from "@/lib/coupons";
 import { subscribeToNewsletter } from "@/lib/newsletter";
 import { prisma } from "@/lib/prisma";
@@ -24,9 +30,79 @@ async function ensureCouponRedemption(order: {
   }
 }
 
+/** Mark an issued invoice paid after Stripe Checkout (invoice payment path). */
+export async function fulfillInvoiceCheckoutSession(
+  session: Stripe.Checkout.Session,
+): Promise<void> {
+  const invoiceId = session.metadata?.invoiceId;
+  if (!invoiceId) return;
+
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: invoiceId },
+    include: { order: { include: { user: true, items: true } }, lines: true },
+  });
+  if (!invoice) return;
+  if (invoice.status === "PAID") return;
+
+  const paymentIntentId =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : session.payment_intent?.id ?? null;
+
+  const taxCents = session.total_details?.amount_tax ?? invoice.taxCents;
+  const totalCents = session.amount_total ?? invoice.totalCents;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        status: "PAID",
+        paidAt: new Date(),
+        taxCents,
+        totalCents,
+        stripeCheckoutSessionId: session.id,
+      },
+    });
+    await tx.order.update({
+      where: { id: invoice.orderId },
+      data: {
+        status: "PAID",
+        stripeSessionId: session.id,
+        stripePaymentIntentId: paymentIntentId,
+        taxCents,
+        totalCents,
+        paymentMethod: "CARD",
+      },
+    });
+  });
+
+  try {
+    await sendOrderConfirmationEmail({
+      to: invoice.order.user.email,
+      customerName: invoice.order.user.name,
+      orderId: invoice.orderId,
+      invoiceNumber: invoice.invoiceNumber,
+      totalCents,
+      fulfillmentType: invoice.order.fulfillmentType,
+      items: invoice.lines.map((l) => ({
+        name: l.description,
+        quantity: Math.max(1, Math.round(l.quantity)),
+        priceCents: l.unitPriceCents,
+      })),
+    });
+  } catch (error) {
+    console.error("Invoice paid email failed:", error);
+  }
+}
+
 export async function fulfillCheckoutSession(
   session: Stripe.Checkout.Session,
 ): Promise<void> {
+  if (session.metadata?.invoiceId) {
+    await fulfillInvoiceCheckoutSession(session);
+    return;
+  }
+
   const orderId = session.metadata?.orderId;
   if (!orderId) {
     console.error("Checkout session missing orderId metadata", session.id);
@@ -52,6 +128,12 @@ export async function fulfillCheckoutSession(
 
   // Idempotent payment path — still ensure redemption/newsletter on retries
   if (existing.status === "PAID" || existing.invoice) {
+    if (existing.invoice?.status !== "PAID" && existing.invoice) {
+      await prisma.invoice.update({
+        where: { id: existing.invoice.id },
+        data: { status: "PAID", paidAt: new Date() },
+      });
+    }
     await ensureCouponRedemption({
       id: existing.id,
       couponId: existing.couponId,
@@ -70,6 +152,23 @@ export async function fulfillCheckoutSession(
   const totalCents = session.amount_total ?? existing.totalCents;
   const invoiceNumber = await nextInvoiceNumber();
 
+  const fixedLines = existing.items.map((item, index) => ({
+    productId: item.productId,
+    description: item.productNameSnapshot,
+    quantity: item.quantity,
+    unitLabel: "each",
+    unitPriceCents: item.priceCents,
+    lineTotalCents: item.priceCents * item.quantity,
+    awaitingWeight: false,
+    sortOrder: index,
+  }));
+
+  const totals = recalculateInvoiceTotals({
+    lines: fixedLines,
+    discountCents,
+    taxCents,
+  });
+
   await prisma.$transaction(async (tx) => {
     await tx.order.update({
       where: { id: orderId },
@@ -87,7 +186,15 @@ export async function fulfillCheckoutSession(
       data: {
         orderId,
         invoiceNumber,
-        stripeInvoiceId: null,
+        status: "PAID",
+        subtotalCents: totals.subtotalCents,
+        discountCents: totals.discountCents,
+        taxCents: totals.taxCents,
+        totalCents: totalCents,
+        issuedAt: new Date(),
+        paidAt: new Date(),
+        stripeCheckoutSessionId: session.id,
+        lines: { create: fixedLines },
       },
     });
 
@@ -146,3 +253,5 @@ export async function fulfillCheckoutSession(
     console.error("Order email failed:", error);
   }
 }
+
+export { sendInvoiceIssuedEmail } from "@/lib/email";

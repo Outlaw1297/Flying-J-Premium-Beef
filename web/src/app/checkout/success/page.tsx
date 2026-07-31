@@ -16,8 +16,10 @@ type SuccessPageProps = {
   searchParams: Promise<{
     session_id?: string;
     order_id?: string;
+    invoice_id?: string;
     guest?: string;
     confirm?: string;
+    deferred?: string;
   }>;
 };
 
@@ -27,8 +29,10 @@ export default async function CheckoutSuccessPage({
   const {
     session_id: sessionId,
     order_id: orderIdParam,
+    invoice_id: invoiceIdParam,
     guest: guestParam,
     confirm: confirmToken,
+    deferred: deferredParam,
   } = await searchParams;
   const session = await auth();
 
@@ -41,6 +45,8 @@ export default async function CheckoutSuccessPage({
   let guestName: string | null = null;
   let claimToken: string | null = null;
   let isGuestOrder = guestParam === "1";
+  let isDeferred = deferredParam === "1";
+  let invoiceId: string | null = invoiceIdParam ?? null;
 
   if (sessionId && process.env.STRIPE_SECRET_KEY) {
     try {
@@ -70,8 +76,12 @@ export default async function CheckoutSuccessPage({
         orderId = order.id;
         totalCents = order.totalCents;
         invoiceNumber = order.invoice?.invoiceNumber ?? null;
+        invoiceId = order.invoice?.id ?? null;
         paymentMethod = order.paymentMethod;
         paidOnline = order.status === "PAID";
+        if (order.paymentMethod === "INVOICE" && order.invoice?.status === "DRAFT") {
+          isDeferred = true;
+        }
         if (!order.user.passwordHash) {
           isGuestOrder = true;
           guestEmail = order.user.email;
@@ -108,8 +118,12 @@ export default async function CheckoutSuccessPage({
       orderId = order.id;
       totalCents = order.totalCents;
       invoiceNumber = order.invoice?.invoiceNumber ?? null;
+      invoiceId = order.invoice?.id ?? null;
       paymentMethod = order.paymentMethod;
       paidOnline = order.status === "PAID";
+      if (order.paymentMethod === "INVOICE" && order.invoice?.status === "DRAFT") {
+        isDeferred = true;
+      }
       if (!order.user.passwordHash) {
         isGuestOrder = true;
         guestEmail = order.user.email;
@@ -141,20 +155,24 @@ export default async function CheckoutSuccessPage({
       <p className="text-sm font-semibold uppercase tracking-wider text-copper">
         {paidOnline
           ? "Payment received"
-          : isOfflinePay
-            ? "Order placed"
-            : "Thank you"}
+          : isDeferred
+            ? "Order received"
+            : isOfflinePay
+              ? "Order placed"
+              : "Thank you"}
       </p>
       <h1 className="mt-3 font-display text-3xl font-semibold text-charcoal sm:text-4xl">
-        Thank you for your order
+        {isDeferred ? "We've got your order" : "Thank you for your order"}
       </h1>
       <p className="mt-4 text-charcoal/70 leading-relaxed">
         {orderId
-          ? isOfflinePay
-            ? `We'll prepare your Flying J Premium Beef. Please bring ${
-                paymentMethod === "CHECK" ? "a check" : "cash"
-              } when you pick up or receive delivery.`
-            : "We'll prepare your Flying J Premium Beef and notify you when it's ready for pickup or delivery."
+          ? isDeferred
+            ? "We'll confirm hanging weight, then email your final invoice so you can pay online or at pickup."
+            : isOfflinePay
+              ? `We'll prepare your Flying J Premium Beef. Please bring ${
+                  paymentMethod === "CHECK" ? "a check" : "cash"
+                } when you pick up or receive delivery.`
+              : "We'll prepare your Flying J Premium Beef and notify you when it's ready for pickup or delivery."
           : "If you just completed checkout, your confirmation may still be processing. Check your email or sign in to view orders."}
       </p>
 
@@ -174,10 +192,25 @@ export default async function CheckoutSuccessPage({
               </span>
             </p>
           )}
-          {isOfflinePay && (
+          {isDeferred && (
+            <p className="mt-2 text-sm font-medium text-copper">
+              Final total after weigh-in — we&apos;ll email your invoice
+            </p>
+          )}
+          {isOfflinePay && !isDeferred && (
             <p className="mt-2 text-sm font-medium text-copper">
               Due at pickup / delivery —{" "}
               {paymentMethod === "CHECK" ? "check" : "cash"}
+            </p>
+          )}
+          {invoiceId && (
+            <p className="mt-3">
+              <Link
+                href={`/account/invoices/${invoiceId}`}
+                className="text-sm font-medium text-copper hover:underline"
+              >
+                View invoice →
+              </Link>
             </p>
           )}
         </div>

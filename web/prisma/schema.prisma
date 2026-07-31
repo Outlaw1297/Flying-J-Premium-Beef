@@ -31,6 +31,19 @@ enum PaymentMethod {
   CARD
   CASH
   CHECK
+  INVOICE
+}
+
+enum PricingMode {
+  FIXED
+  PER_POUND_HANGING
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  VOID
 }
 
 enum CouponType {
@@ -95,24 +108,29 @@ model User {
 }
 
 model Product {
-  id              String   @id @default(cuid())
+  id              String      @id @default(cuid())
   name            String
-  slug            String   @unique
+  slug            String      @unique
   description     String?
-  priceCents      Int      @map("price_cents")
-  weightLabel     String?  @map("weight_label")
-  inventoryCount  Int      @default(0) @map("inventory_count")
-  imageUrl        String?  @map("image_url")
-  active          Boolean  @default(true)
+  /** FIXED: package price. PER_POUND_HANGING: cents per lb hanging weight. */
+  priceCents      Int         @map("price_cents")
+  pricingMode     PricingMode @default(FIXED) @map("pricing_mode")
+  /** Optional estimate shown at checkout for hanging-weight products. */
+  estimatedLbs    Float?      @map("estimated_lbs")
+  weightLabel     String?     @map("weight_label")
+  inventoryCount  Int         @default(0) @map("inventory_count")
+  imageUrl        String?     @map("image_url")
+  active          Boolean     @default(true)
   category        String?
   /** Stripe Product Tax Code (PTC), e.g. txcd_40040013 Meat and Meat Products */
-  stripeTaxCode   String   @default("txcd_40040013") @map("stripe_tax_code")
-  stripeProductId String?  @unique @map("stripe_product_id")
-  stripePriceId   String?  @unique @map("stripe_price_id")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  stripeTaxCode   String      @default("txcd_40040013") @map("stripe_tax_code")
+  stripeProductId String?     @unique @map("stripe_product_id")
+  stripePriceId   String?     @unique @map("stripe_price_id")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
 
-  orderItems OrderItem[]
+  orderItems   OrderItem[]
+  invoiceLines InvoiceLine[]
 
   @@map("products")
 }
@@ -166,16 +184,46 @@ model OrderItem {
 }
 
 model Invoice {
-  id              String   @id @default(cuid())
-  orderId         String   @unique @map("order_id")
-  invoiceNumber   String   @unique @map("invoice_number")
-  stripeInvoiceId String?  @map("stripe_invoice_id")
-  pdfUrl          String?  @map("pdf_url")
-  issuedAt        DateTime @default(now()) @map("issued_at")
+  id                      String        @id @default(cuid())
+  orderId                 String        @unique @map("order_id")
+  invoiceNumber           String        @unique @map("invoice_number")
+  status                  InvoiceStatus @default(DRAFT)
+  subtotalCents           Int           @default(0) @map("subtotal_cents")
+  taxCents                Int           @default(0) @map("tax_cents")
+  discountCents           Int           @default(0) @map("discount_cents")
+  totalCents              Int           @default(0) @map("total_cents")
+  notes                   String?
+  stripeInvoiceId         String?       @map("stripe_invoice_id")
+  stripeCheckoutSessionId String?       @map("stripe_checkout_session_id")
+  pdfUrl                  String?       @map("pdf_url")
+  issuedAt                DateTime?     @map("issued_at")
+  paidAt                  DateTime?     @map("paid_at")
+  createdAt               DateTime      @default(now()) @map("created_at")
+  updatedAt               DateTime      @updatedAt @map("updated_at")
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lines InvoiceLine[]
 
   @@map("invoices")
+}
+
+model InvoiceLine {
+  id             String  @id @default(cuid())
+  invoiceId      String  @map("invoice_id")
+  productId      String? @map("product_id")
+  description    String
+  /** Count for fixed items; hanging pounds for per-lb products. */
+  quantity       Float
+  unitLabel      String  @default("each") @map("unit_label")
+  unitPriceCents Int     @map("unit_price_cents")
+  lineTotalCents Int     @map("line_total_cents")
+  awaitingWeight Boolean @default(false) @map("awaiting_weight")
+  sortOrder      Int     @default(0) @map("sort_order")
+
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@map("invoice_lines")
 }
 
 model Coupon {
