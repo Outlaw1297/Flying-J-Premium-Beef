@@ -8,6 +8,8 @@ services:
   - type: web
     name: flying-j-beef
     runtime: node
+    repo: https://github.com/Outlaw1297/Flying-J-Premium-Beef
+    branch: cursor/foundation-phase1-b36d
     rootDir: web
     plan: free
     buildCommand: npm install && npx prisma migrate deploy && npm run build
