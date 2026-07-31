@@ -26,11 +26,24 @@ Open [http://localhost:3000](http://localhost:3000).
 
 1. Push this repo to GitHub.
 2. In Render Dashboard → **New Blueprint** → connect repo (uses `render.yaml` on `main`).
-3. Set `NEXTAUTH_URL` to your Render service URL (e.g. `https://flying-j-beef.onrender.com`).
+3. Set environment variables:
+   - `NEXTAUTH_URL` → `https://flying-j-beef.onrender.com`
+   - `STRIPE_SECRET_KEY` / `STRIPE_PUBLISHABLE_KEY` (Stripe test keys)
+   - `STRIPE_WEBHOOK_SECRET` (from Stripe webhook endpoint)
 4. After first deploy, seed products via Render shell:
    ```bash
    SEED_ADMIN_PASSWORD='your-secure-password' npm run db:seed
    ```
+
+### Stripe webhook
+
+In [Stripe Dashboard → Webhooks](https://dashboard.stripe.com/test/webhooks), add endpoint:
+
+`https://flying-j-beef.onrender.com/api/stripe/webhook`
+
+Event: `checkout.session.completed`
+
+Copy the signing secret into Render as `STRIPE_WEBHOOK_SECRET`.
 
 ## Phase 1 status (foundation)
 

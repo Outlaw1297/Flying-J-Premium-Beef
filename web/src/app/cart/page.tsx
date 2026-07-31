@@ -40,7 +40,7 @@ export default async function CartPage() {
           </div>
 
           <p className="mt-2 text-xs text-charcoal/50">
-            Taxes and checkout coming in Phase 3.
+            Secure payment via Stripe. You&apos;ll confirm pickup or delivery next.
           </p>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -50,13 +50,12 @@ export default async function CartPage() {
             >
               Continue shopping
             </Link>
-            <button
-              type="button"
-              disabled
-              className="inline-flex justify-center rounded-full bg-charcoal/40 px-6 py-3 text-sm font-semibold text-cream cursor-not-allowed"
+            <Link
+              href="/checkout"
+              className="inline-flex justify-center rounded-full bg-copper px-6 py-3 text-sm font-semibold text-cream hover:bg-copper/90 transition-colors"
             >
-              Checkout (coming soon)
-            </button>
+              Checkout
+            </Link>
           </div>
         </div>
       )}

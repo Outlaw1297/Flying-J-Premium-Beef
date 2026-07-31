@@ -100,7 +100,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           </div>
 
           <p className="mt-6 text-xs text-charcoal/50">
-            Federally inspected. Pickup available after checkout (Phase 3).
+            Federally inspected. Secure checkout with Stripe.
           </p>
         </div>
       </div>
