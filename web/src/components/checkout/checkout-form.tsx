@@ -145,7 +145,7 @@ export function CheckoutForm({
             inputMode="tel"
             autoComplete="tel"
             required
-            placeholder="(555) 123-4567"
+            placeholder="+1 (555) 123-4567"
             value={phone}
             onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
             className={inputClass}

@@ -74,6 +74,7 @@ export function ProfileForm({
             name="phone"
             type="tel"
             required
+            placeholder="+1 (555) 123-4567"
             value={phone}
             onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
             className={inputClass}
