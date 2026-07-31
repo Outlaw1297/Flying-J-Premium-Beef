@@ -14,6 +14,7 @@ export async function registerAction(
   const name = formData.get("name");
   const email = formData.get("email");
   const password = formData.get("password");
+  const claim = String(formData.get("claim") || "").trim();
   const newsletter = formData.get("newsletter") === "on";
 
   if (!name || !email || !password) {
@@ -36,12 +37,20 @@ export async function registerAction(
   }
 
   if (existing) {
-    // Claim guest checkout account (orders already attached)
+    // Guest claim requires the token from the order confirmation page
+    if (!claim || !existing.claimToken || claim !== existing.claimToken) {
+      return {
+        error:
+          "To claim this guest order, use the Create account link from your order confirmation page.",
+      };
+    }
+
     await prisma.user.update({
       where: { id: existing.id },
       data: {
         name: nameStr,
         passwordHash,
+        claimToken: null,
         newsletterSubscribed: newsletter || existing.newsletterSubscribed,
       },
     });

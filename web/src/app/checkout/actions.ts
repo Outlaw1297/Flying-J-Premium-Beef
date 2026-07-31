@@ -11,6 +11,7 @@ import {
   setAppliedCouponCode,
   syncCouponToStripe,
 } from "@/lib/coupons";
+import { createOrderConfirmToken } from "@/lib/guest-tokens";
 import { subscribeToNewsletter } from "@/lib/newsletter";
 import { getAppUrl, getStripe } from "@/lib/stripe";
 import { nextInvoiceNumber } from "@/lib/invoices";
@@ -317,8 +318,9 @@ export async function createCheckoutSessionAction(
 
     await setCart([]);
     await setAppliedCouponCode(null);
+    const confirm = createOrderConfirmToken(order.id);
     redirect(
-      `/checkout/success?order_id=${order.id}${
+      `/checkout/success?order_id=${order.id}&confirm=${encodeURIComponent(confirm)}${
         checkoutUser.isGuest ? "&guest=1" : ""
       }`,
     );

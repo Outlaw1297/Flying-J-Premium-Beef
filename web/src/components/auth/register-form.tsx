@@ -11,12 +11,14 @@ export function RegisterForm() {
   const searchParams = useSearchParams();
   const defaultEmail = searchParams.get("email") ?? "";
   const defaultName = searchParams.get("name") ?? "";
+  const claim = searchParams.get("claim") ?? "";
   const fromCheckout = searchParams.get("from") === "checkout";
 
   const [state, formAction, pending] = useActionState(registerAction, initialState);
 
   return (
     <form action={formAction} className="space-y-5">
+      {claim ? <input type="hidden" name="claim" value={claim} /> : null}
       {state.error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {state.error}

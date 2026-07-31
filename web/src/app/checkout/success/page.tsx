@@ -6,6 +6,7 @@ import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { fulfillCheckoutSession } from "@/lib/orders";
 import { auth } from "@/lib/auth";
+import { verifyOrderConfirmToken } from "@/lib/guest-tokens";
 
 export const metadata: Metadata = {
   title: "Order confirmed",
@@ -16,6 +17,7 @@ type SuccessPageProps = {
     session_id?: string;
     order_id?: string;
     guest?: string;
+    confirm?: string;
   }>;
 };
 
@@ -26,6 +28,7 @@ export default async function CheckoutSuccessPage({
     session_id: sessionId,
     order_id: orderIdParam,
     guest: guestParam,
+    confirm: confirmToken,
   } = await searchParams;
   const session = await auth();
 
@@ -36,6 +39,7 @@ export default async function CheckoutSuccessPage({
   let paidOnline = false;
   let guestEmail: string | null = null;
   let guestName: string | null = null;
+  let claimToken: string | null = null;
   let isGuestOrder = guestParam === "1";
 
   if (sessionId && process.env.STRIPE_SECRET_KEY) {
@@ -51,7 +55,14 @@ export default async function CheckoutSuccessPage({
         where: { stripeSessionId: sessionId },
         include: {
           invoice: true,
-          user: { select: { email: true, name: true, passwordHash: true } },
+          user: {
+            select: {
+              email: true,
+              name: true,
+              passwordHash: true,
+              claimToken: true,
+            },
+          },
         },
       });
 
@@ -65,6 +76,7 @@ export default async function CheckoutSuccessPage({
           isGuestOrder = true;
           guestEmail = order.user.email;
           guestName = order.user.name;
+          claimToken = order.user.claimToken;
         }
       }
     } catch (error) {
@@ -75,15 +87,24 @@ export default async function CheckoutSuccessPage({
       where: { id: orderIdParam },
       include: {
         invoice: true,
-        user: { select: { email: true, name: true, passwordHash: true } },
+        user: {
+          select: {
+            email: true,
+            name: true,
+            passwordHash: true,
+            claimToken: true,
+          },
+        },
       },
     });
 
-    const canView =
-      order &&
-      (order.userId === session?.user?.id || !order.user.passwordHash);
+    const isOwner = Boolean(order && order.userId === session?.user?.id);
+    const guestConfirmOk =
+      Boolean(order) &&
+      !order!.user.passwordHash &&
+      verifyOrderConfirmToken(confirmToken, order!.id);
 
-    if (order && canView) {
+    if (order && (isOwner || guestConfirmOk)) {
       orderId = order.id;
       totalCents = order.totalCents;
       invoiceNumber = order.invoice?.invoiceNumber ?? null;
@@ -93,6 +114,7 @@ export default async function CheckoutSuccessPage({
         isGuestOrder = true;
         guestEmail = order.user.email;
         guestName = order.user.name;
+        claimToken = order.user.claimToken;
       }
     }
   }
@@ -103,13 +125,15 @@ export default async function CheckoutSuccessPage({
   const showAccountCta =
     isGuestOrder &&
     guestEmail &&
+    claimToken &&
     !(session?.user?.id && session.user.email === guestEmail);
 
-  const registerHref = guestEmail
-    ? `/register?email=${encodeURIComponent(guestEmail)}${
-        guestName ? `&name=${encodeURIComponent(guestName)}` : ""
-      }&from=checkout`
-    : "/register?from=checkout";
+  const registerHref =
+    guestEmail && claimToken
+      ? `/register?email=${encodeURIComponent(guestEmail)}${
+          guestName ? `&name=${encodeURIComponent(guestName)}` : ""
+        }&claim=${encodeURIComponent(claimToken)}&from=checkout`
+      : "/register?from=checkout";
 
   return (
     <div className="mx-auto max-w-lg px-4 py-16 sm:px-6 sm:py-20 text-center">
@@ -125,11 +149,13 @@ export default async function CheckoutSuccessPage({
         Thank you for your order
       </h1>
       <p className="mt-4 text-charcoal/70 leading-relaxed">
-        {isOfflinePay
-          ? `We'll prepare your Flying J Premium Beef. Please bring ${
-              paymentMethod === "CHECK" ? "a check" : "cash"
-            } when you pick up or receive delivery.`
-          : "We'll prepare your Flying J Premium Beef and notify you when it's ready for pickup or delivery."}
+        {orderId
+          ? isOfflinePay
+            ? `We'll prepare your Flying J Premium Beef. Please bring ${
+                paymentMethod === "CHECK" ? "a check" : "cash"
+              } when you pick up or receive delivery.`
+            : "We'll prepare your Flying J Premium Beef and notify you when it's ready for pickup or delivery."
+          : "If you just completed checkout, your confirmation may still be processing. Check your email or sign in to view orders."}
       </p>
 
       {(invoiceNumber || totalCents !== null) && (
@@ -166,7 +192,8 @@ export default async function CheckoutSuccessPage({
             Create a password for{" "}
             <span className="font-medium text-charcoal">{guestEmail}</span> to
             track this order, get newsletters and coupons, and reorder your
-            favorites faster next time.
+            favorites faster next time. Use this page&apos;s link so we can
+            securely attach your guest order.
           </p>
           <Link
             href={registerHref}
