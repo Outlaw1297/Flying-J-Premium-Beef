@@ -6,10 +6,9 @@ export function phoneDigits(phone: string): string {
 export function normalizeUsPhone(phone: string): string | null {
   let digits = phoneDigits(phone);
   // Country code (+1). NANP area codes never start with 0 or 1.
-  if (digits.startsWith("1") && digits.length >= 11) {
+  if (digits.startsWith("1") && digits.length === 11) {
     digits = digits.slice(1);
   }
-  digits = digits.slice(0, 10);
   if (digits.length !== 10) return null;
   if (digits.startsWith("0") || digits.startsWith("1")) return null;
   return digits;
