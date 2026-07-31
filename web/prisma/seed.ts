@@ -86,21 +86,39 @@ const products = [
 ];
 
 async function main() {
-  const adminEmail = "admin@flyingjbeef.com";
-  const adminPassword = "changeme123";
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@flyingjbeef.com";
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
 
-  const passwordHash = await hash(adminPassword, 12);
-
-  await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {},
-    create: {
-      email: adminEmail,
-      name: "Flying J Admin",
-      passwordHash,
-      role: UserRole.ADMIN,
-    },
-  });
+  if (adminPassword) {
+    const passwordHash = await hash(adminPassword, 12);
+    await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: { passwordHash, role: UserRole.ADMIN },
+      create: {
+        email: adminEmail,
+        name: "Flying J Admin",
+        passwordHash,
+        role: UserRole.ADMIN,
+      },
+    });
+    console.log(`Admin user ready: ${adminEmail}`);
+  } else if (process.env.NODE_ENV !== "production") {
+    const devPassword = "changeme123";
+    const passwordHash = await hash(devPassword, 12);
+    await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: {},
+      create: {
+        email: adminEmail,
+        name: "Flying J Admin",
+        passwordHash,
+        role: UserRole.ADMIN,
+      },
+    });
+    console.log(`Dev admin: ${adminEmail} / ${devPassword}`);
+  } else {
+    console.log("SEED_ADMIN_PASSWORD not set — skipping admin user in production");
+  }
 
   for (const product of products) {
     await prisma.product.upsert({
@@ -111,7 +129,6 @@ async function main() {
   }
 
   console.log("Seed complete.");
-  console.log(`Admin login: ${adminEmail} / ${adminPassword} (change in production)`);
 }
 
 main()

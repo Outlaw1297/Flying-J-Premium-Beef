@@ -9,7 +9,7 @@ services:
     name: flying-j-beef
     runtime: node
     repo: https://github.com/Outlaw1297/Flying-J-Premium-Beef
-    branch: cursor/foundation-phase1-b36d
+    branch: main
     rootDir: web
     plan: free
     buildCommand: npm install && npx prisma migrate deploy && npm run build
@@ -27,7 +27,7 @@ services:
           name: flying-j-beef
           type: web
           envVarKey: AUTH_SECRET
+      - key: AUTH_TRUST_HOST
+        value: "true"
       - key: NEXTAUTH_URL
         sync: false
-      - key: NODE_ENV
-        value: production

@@ -20,14 +20,17 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-**Seed admin (development only):** `admin@flyingjbeef.com` / `changeme123`
+**Seed admin (local dev only):** `admin@flyingjbeef.com` / `changeme123`
 
 ## Deploy on Render
 
 1. Push this repo to GitHub.
-2. In Render Dashboard → **New Blueprint** → connect repo (uses `render.yaml`).
+2. In Render Dashboard → **New Blueprint** → connect repo (uses `render.yaml` on `main`).
 3. Set `NEXTAUTH_URL` to your Render service URL (e.g. `https://flying-j-beef.onrender.com`).
-4. After first deploy, run seed via Render shell: `npm run db:seed`
+4. After first deploy, seed products via Render shell:
+   ```bash
+   SEED_ADMIN_PASSWORD='your-secure-password' npm run db:seed
+   ```
 
 ## Phase 1 status (foundation)
 
