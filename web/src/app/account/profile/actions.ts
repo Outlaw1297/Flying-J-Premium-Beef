@@ -73,19 +73,25 @@ export async function updateProfileAction(
     },
   });
 
+  const current = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { newsletterSubscribed: true, email: true },
+  });
   const wantNewsletter = formData.get("newsletter") === "on";
-  const { subscribeToNewsletter, unsubscribeFromNewsletter } = await import(
-    "@/lib/newsletter"
-  );
-  if (wantNewsletter) {
-    await subscribeToNewsletter({
-      email: session.user.email!,
-      source: "ACCOUNT",
-      userId: session.user.id,
-      sendWelcome: false,
-    });
-  } else {
-    await unsubscribeFromNewsletter(session.user.email!);
+  if (current && wantNewsletter !== current.newsletterSubscribed) {
+    const { subscribeToNewsletter, unsubscribeFromNewsletter } = await import(
+      "@/lib/newsletter"
+    );
+    if (wantNewsletter) {
+      await subscribeToNewsletter({
+        email: current.email,
+        source: "ACCOUNT",
+        userId: session.user.id,
+        sendWelcome: false,
+      });
+    } else {
+      await unsubscribeFromNewsletter(current.email);
+    }
   }
 
   revalidatePath("/account");

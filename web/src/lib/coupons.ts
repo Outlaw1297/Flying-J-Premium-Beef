@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
-import type { Coupon, CouponType } from "@/generated/prisma/client";
+import type { Coupon, CouponType, Prisma } from "@/generated/prisma/client";
 import { CouponType as CouponTypeEnum } from "@/generated/prisma/enums";
 
 export const COUPON_COOKIE = "fj-coupon";
@@ -113,6 +113,16 @@ export async function resolveAppliedCoupon(
 export async function syncCouponToStripe(coupon: Coupon): Promise<string | null> {
   if (!process.env.STRIPE_SECRET_KEY) return null;
 
+  if (coupon.stripePromotionCodeId) {
+    return coupon.stripePromotionCodeId;
+  }
+
+  // Re-read in case another request just synced
+  const fresh = await prisma.coupon.findUnique({ where: { id: coupon.id } });
+  if (fresh?.stripePromotionCodeId) {
+    return fresh.stripePromotionCodeId;
+  }
+
   const stripe = getStripe();
 
   const stripeCoupon =
@@ -149,31 +159,66 @@ export async function syncCouponToStripe(coupon: Coupon): Promise<string | null>
   return promo.id;
 }
 
-export async function recordCouponRedemption(input: {
-  couponId: string;
-  orderId: string;
-  userId: string;
-  discountCents: number;
-}): Promise<void> {
-  const existing = await prisma.couponRedemption.findFirst({
-    where: { orderId: input.orderId, couponId: input.couponId },
-  });
-  if (existing) return;
+export async function setStripePromotionActive(
+  stripePromotionCodeId: string | null | undefined,
+  active: boolean,
+): Promise<void> {
+  if (!stripePromotionCodeId || !process.env.STRIPE_SECRET_KEY) return;
+  const stripe = getStripe();
+  await stripe.promotionCodes.update(stripePromotionCodeId, { active });
+}
 
-  await prisma.$transaction([
-    prisma.couponRedemption.create({
+type TxClient = Prisma.TransactionClient;
+
+/** Atomically record redemption and increment uses (respects maxUses). */
+export async function recordCouponRedemption(
+  input: {
+    couponId: string;
+    orderId: string;
+    userId: string;
+    discountCents: number;
+  },
+  tx?: TxClient,
+): Promise<void> {
+  const run = async (client: TxClient) => {
+    const existing = await client.couponRedemption.findFirst({
+      where: { orderId: input.orderId, couponId: input.couponId },
+    });
+    if (existing) return;
+
+    const coupon = await client.coupon.findUnique({
+      where: { id: input.couponId },
+    });
+    if (!coupon) {
+      throw new Error("Coupon not found");
+    }
+    if (coupon.maxUses != null && coupon.usesCount >= coupon.maxUses) {
+      throw new Error("This coupon has reached its usage limit");
+    }
+
+    await client.couponRedemption.create({
       data: {
         couponId: input.couponId,
         orderId: input.orderId,
         userId: input.userId,
         discountCents: input.discountCents,
       },
-    }),
-    prisma.coupon.update({
+    });
+    await client.coupon.update({
       where: { id: input.couponId },
       data: { usesCount: { increment: 1 } },
-    }),
-  ]);
+    });
+  };
+
+  if (tx) {
+    await run(tx);
+    return;
+  }
+
+  await prisma.$transaction(
+    async (client) => run(client),
+    { isolationLevel: "Serializable" },
+  );
 }
 
 export function formatCouponValue(type: CouponType, value: number): string {

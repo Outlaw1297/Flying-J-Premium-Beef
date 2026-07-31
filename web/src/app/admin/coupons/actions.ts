@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import { syncCouponToStripe } from "@/lib/coupons";
+import { syncCouponToStripe, setStripePromotionActive } from "@/lib/coupons";
 import { prisma } from "@/lib/prisma";
 import { CouponType } from "@/generated/prisma/enums";
 
@@ -111,10 +111,17 @@ export async function toggleCouponAction(formData: FormData): Promise<void> {
   const active = formData.get("active") === "true";
   if (!id) return;
 
-  await prisma.coupon.update({
+  const nextActive = !active;
+  const coupon = await prisma.coupon.update({
     where: { id },
-    data: { active: !active },
+    data: { active: nextActive },
   });
+
+  try {
+    await setStripePromotionActive(coupon.stripePromotionCodeId, nextActive);
+  } catch (error) {
+    console.error("Stripe promo toggle failed:", error);
+  }
 
   revalidatePath("/admin/coupons");
 }

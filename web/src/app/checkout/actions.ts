@@ -232,14 +232,7 @@ export async function createCheckoutSessionAction(
     };
   }
 
-  if (formData.get("newsletter") === "on") {
-    await subscribeToNewsletter({
-      email: checkoutUser.email,
-      source: "CHECKOUT",
-      userId: checkoutUser.userId,
-      sendWelcome: true,
-    });
-  }
+  const wantNewsletter = formData.get("newsletter") === "on";
 
   const orderBase = {
     userId: checkoutUser.userId,
@@ -268,32 +261,57 @@ export async function createCheckoutSessionAction(
   if (paymentMethod !== PaymentMethod.CARD) {
     const invoiceNumber = await nextInvoiceNumber();
 
-    const order = await prisma.$transaction(async (tx) => {
-      const created = await tx.order.create({ data: orderBase });
+    let order;
+    try {
+      order = await prisma.$transaction(
+        async (tx) => {
+          const created = await tx.order.create({ data: orderBase });
 
-      await tx.invoice.create({
-        data: {
-          orderId: created.id,
-          invoiceNumber,
+          await tx.invoice.create({
+            data: {
+              orderId: created.id,
+              invoiceNumber,
+            },
+          });
+
+          for (const item of cart) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { inventoryCount: { decrement: item.quantity } },
+            });
+          }
+
+          if (appliedCoupon) {
+            await recordCouponRedemption(
+              {
+                couponId: appliedCoupon.coupon.id,
+                orderId: created.id,
+                userId: checkoutUser.userId,
+                discountCents,
+              },
+              tx,
+            );
+          }
+
+          return created;
         },
-      });
-
-      for (const item of cart) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { inventoryCount: { decrement: item.quantity } },
-        });
+        { isolationLevel: "Serializable" },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message.toLowerCase().includes("usage limit")) {
+        return { error: "This coupon has reached its usage limit" };
       }
+      console.error("Offline checkout failed:", error);
+      return { error: "Unable to place order. Please try again." };
+    }
 
-      return created;
-    });
-
-    if (appliedCoupon) {
-      await recordCouponRedemption({
-        couponId: appliedCoupon.coupon.id,
-        orderId: order.id,
+    if (wantNewsletter) {
+      await subscribeToNewsletter({
+        email: checkoutUser.email,
+        source: "CHECKOUT",
         userId: checkoutUser.userId,
-        discountCents,
+        sendWelcome: true,
       });
     }
 
@@ -414,6 +432,7 @@ export async function createCheckoutSessionAction(
         taxCalculationId: taxQuote.calculationId ?? "",
         couponId: appliedCoupon?.coupon.id ?? "",
         discountCents: String(discountCents),
+        newsletter: wantNewsletter ? "1" : "0",
       },
       success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}${successGuest}`,
       cancel_url: `${appUrl}/checkout/cancel?order_id=${order.id}`,
@@ -436,7 +455,16 @@ export async function createCheckoutSessionAction(
 
   await prisma.order.update({
     where: { id: order.id },
-    data: { stripeSessionId: checkoutSession.id },
+    data: {
+      stripeSessionId: checkoutSession.id,
+      // Prefer Stripe Checkout amounts (promo + automatic tax) over local estimate
+      taxCents:
+        checkoutSession.total_details?.amount_tax ?? orderBase.taxCents,
+      totalCents: checkoutSession.amount_total ?? orderBase.totalCents,
+      discountCents:
+        checkoutSession.total_details?.amount_discount ??
+        orderBase.discountCents,
+    },
   });
 
   if (!checkoutSession.url) {
