@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import {
+  issueInvoiceAction,
   updateInvoiceDraftAction,
   type InvoiceFormState,
 } from "@/app/admin/invoice-actions";
@@ -27,6 +28,7 @@ export function InvoiceEditor({
   initialDiscountCents,
   initialLines,
   editable,
+  canIssue = false,
 }: {
   invoiceId: string;
   initialNotes: string | null;
@@ -34,6 +36,7 @@ export function InvoiceEditor({
   initialDiscountCents: number;
   initialLines: Line[];
   editable: boolean;
+  canIssue?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
     updateInvoiceDraftAction,
@@ -267,13 +270,25 @@ export function InvoiceEditor({
         </span>
       </div>
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-full bg-copper px-6 py-3 text-sm font-semibold text-cream hover:bg-copper/90 disabled:opacity-60"
-      >
-        {pending ? "Saving…" : "Save invoice"}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-full bg-copper px-6 py-3 text-sm font-semibold text-cream hover:bg-copper/90 disabled:opacity-60"
+        >
+          {pending ? "Saving…" : "Save invoice"}
+        </button>
+        {canIssue ? (
+          <button
+            type="submit"
+            formAction={issueInvoiceAction}
+            disabled={pending}
+            className="rounded-full bg-charcoal px-6 py-3 text-sm font-semibold text-cream hover:bg-charcoal/90 disabled:opacity-60"
+          >
+            Issue invoice &amp; email customer
+          </button>
+        ) : null}
+      </div>
     </form>
   );
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/admin";
+import { auth } from "@/lib/auth";
 import {
   invoiceNeedsWeight,
   lineTotalCents,
@@ -25,11 +26,20 @@ const lineSchema = z.object({
   productId: z.string().nullable().optional(),
 });
 
-export async function updateInvoiceDraftAction(
-  _prev: InvoiceFormState,
+async function expireStripeCheckoutSession(
+  sessionId: string | null | undefined,
+): Promise<void> {
+  if (!sessionId || !process.env.STRIPE_SECRET_KEY) return;
+  try {
+    await getStripe().checkout.sessions.expire(sessionId);
+  } catch {
+    // Already expired, completed, or invalid — safe to ignore
+  }
+}
+
+async function persistInvoiceDraft(
   formData: FormData,
-): Promise<InvoiceFormState> {
-  await requireAdmin();
+): Promise<{ error: string } | { invoiceId: string; orderId: string }> {
   const invoiceId = String(formData.get("invoiceId") || "");
   if (!invoiceId) return { error: "Missing invoice" };
 
@@ -40,9 +50,6 @@ export async function updateInvoiceDraftAction(
   if (!invoice) return { error: "Invoice not found" };
   if (invoice.status !== "DRAFT" && invoice.status !== "ISSUED") {
     return { error: "Only draft or issued invoices can be edited" };
-  }
-  if (invoice.status === "ISSUED") {
-    // Allow edits only while unpaid
   }
 
   const notes = String(formData.get("notes") || "").trim() || null;
@@ -64,35 +71,32 @@ export async function updateInvoiceDraftAction(
   }
   if (parsedLines.length === 0) return { error: "Add at least one line" };
 
-  const lines = parsedLines.map((line, index) => {
-    const awaitingWeight =
-      line.awaitingWeight ?? line.unitLabel.toLowerCase().includes("hanging");
+  const normalized = parsedLines.map((line, index) => {
+    const isHanging = line.unitLabel.toLowerCase().includes("hanging");
     const quantity = line.quantity;
+    // Keep awaitingWeight until staff edits the qty field (editor clears the flag)
+    const awaitingWeight = isHanging
+      ? !(quantity > 0) || line.awaitingWeight === true
+      : false;
     return {
       description: line.description.trim(),
       quantity,
       unitLabel: line.unitLabel.trim() || "each",
       unitPriceCents: line.unitPriceCents,
       lineTotalCents: lineTotalCents(quantity, line.unitPriceCents),
-      awaitingWeight: awaitingWeight && !(quantity > 0) ? true : awaitingWeight && quantity <= 0,
+      awaitingWeight,
       productId: line.productId || null,
       sortOrder: index,
     };
   });
-
-  // If quantity entered on hanging line, clear awaiting flag
-  const normalized = lines.map((l) => ({
-    ...l,
-    awaitingWeight: l.unitLabel.toLowerCase().includes("hanging")
-      ? !(l.quantity > 0)
-      : false,
-  }));
 
   const totals = recalculateInvoiceTotals({
     lines: normalized,
     discountCents: Math.round(discountDollars * 100),
     taxCents: Math.round(taxDollars * 100),
   });
+
+  await expireStripeCheckoutSession(invoice.stripeCheckoutSessionId);
 
   await prisma.$transaction(async (tx) => {
     await tx.invoiceLine.deleteMany({ where: { invoiceId } });
@@ -104,6 +108,7 @@ export async function updateInvoiceDraftAction(
         discountCents: totals.discountCents,
         taxCents: totals.taxCents,
         totalCents: totals.totalCents,
+        stripeCheckoutSessionId: null,
         lines: { create: normalized },
       },
     });
@@ -118,9 +123,20 @@ export async function updateInvoiceDraftAction(
     });
   });
 
+  return { invoiceId, orderId: invoice.orderId };
+}
+
+export async function updateInvoiceDraftAction(
+  _prev: InvoiceFormState,
+  formData: FormData,
+): Promise<InvoiceFormState> {
+  await requireAdmin();
+  const result = await persistInvoiceDraft(formData);
+  if ("error" in result) return { error: result.error };
+
   revalidatePath("/admin/invoices");
-  revalidatePath(`/admin/invoices/${invoiceId}`);
-  revalidatePath(`/admin/orders/${invoice.orderId}`);
+  revalidatePath(`/admin/invoices/${result.invoiceId}`);
+  revalidatePath(`/admin/orders/${result.orderId}`);
   return { success: "Invoice saved" };
 }
 
@@ -130,6 +146,16 @@ export async function issueInvoiceAction(
   await requireAdmin();
   const invoiceId = String(formData.get("invoiceId") || "");
   if (!invoiceId) return;
+
+  // Persist editor fields when Issue is submitted from the invoice form
+  if (formData.has("linesJson")) {
+    const saved = await persistInvoiceDraft(formData);
+    if ("error" in saved) {
+      redirect(
+        `/admin/invoices/${invoiceId}?error=${encodeURIComponent(saved.error)}`,
+      );
+    }
+  }
 
   const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },
@@ -221,6 +247,11 @@ export async function markInvoicePaidAction(
 export async function payInvoiceAction(
   invoiceId: string,
 ): Promise<{ error?: string; url?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { error: "Sign in required" };
+  }
+
   const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },
     include: {
@@ -229,6 +260,13 @@ export async function payInvoiceAction(
     },
   });
   if (!invoice) return { error: "Invoice not found" };
+
+  const isAdmin = session.user.role === "ADMIN";
+  const isOwner = invoice.order.userId === session.user.id;
+  if (!isAdmin && !isOwner) {
+    return { error: "Invoice not found" };
+  }
+
   if (invoice.status !== "ISSUED") {
     return { error: "This invoice is not open for payment" };
   }
@@ -240,6 +278,8 @@ export async function payInvoiceAction(
   const stripe = getStripe();
   const appUrl = getAppUrl();
 
+  await expireStripeCheckoutSession(invoice.stripeCheckoutSessionId);
+
   const customer = await stripe.customers.create({
     email: invoice.order.user.email,
     name: invoice.order.user.name || undefined,
@@ -247,25 +287,58 @@ export async function payInvoiceAction(
     metadata: { userId: invoice.order.userId, invoiceId: invoice.id },
   });
 
-  const session = await stripe.checkout.sessions.create({
+  const line_items = invoice.lines
+    .filter((l) => l.lineTotalCents > 0)
+    .map((l) => ({
+      quantity: 1,
+      price_data: {
+        currency: "usd" as const,
+        unit_amount: l.lineTotalCents,
+        product_data: {
+          name: l.description,
+          description:
+            l.unitLabel === "each"
+              ? undefined
+              : `${l.quantity} ${l.unitLabel} × $${(l.unitPriceCents / 100).toFixed(2)}`,
+        },
+      },
+    }));
+
+  if (invoice.taxCents > 0) {
+    line_items.push({
+      quantity: 1,
+      price_data: {
+        currency: "usd" as const,
+        unit_amount: invoice.taxCents,
+        product_data: {
+          name: "Sales tax",
+          description: undefined,
+        },
+      },
+    });
+  }
+
+  if (line_items.length === 0) {
+    return { error: "Nothing due on this invoice" };
+  }
+
+  let discounts: { coupon: string }[] | undefined;
+  if (invoice.discountCents > 0) {
+    const coupon = await stripe.coupons.create({
+      amount_off: invoice.discountCents,
+      currency: "usd",
+      duration: "once",
+      max_redemptions: 1,
+      name: `Invoice ${invoice.invoiceNumber}`,
+    });
+    discounts = [{ coupon: coupon.id }];
+  }
+
+  const checkoutSession = await stripe.checkout.sessions.create({
     mode: "payment",
     customer: customer.id,
-    line_items: invoice.lines
-      .filter((l) => l.lineTotalCents > 0)
-      .map((l) => ({
-        quantity: 1,
-        price_data: {
-          currency: "usd" as const,
-          unit_amount: l.lineTotalCents,
-          product_data: {
-            name: l.description,
-            description:
-              l.unitLabel === "each"
-                ? undefined
-                : `${l.quantity} ${l.unitLabel} × $${(l.unitPriceCents / 100).toFixed(2)}`,
-          },
-        },
-      })),
+    line_items,
+    ...(discounts ? { discounts } : {}),
     metadata: {
       invoiceId: invoice.id,
       orderId: invoice.orderId,
@@ -277,11 +350,11 @@ export async function payInvoiceAction(
 
   await prisma.invoice.update({
     where: { id: invoice.id },
-    data: { stripeCheckoutSessionId: session.id },
+    data: { stripeCheckoutSessionId: checkoutSession.id },
   });
 
-  if (!session.url) return { error: "Unable to start payment" };
-  return { url: session.url };
+  if (!checkoutSession.url) return { error: "Unable to start payment" };
+  return { url: checkoutSession.url };
 }
 
 export async function adminPayInvoiceAction(formData: FormData): Promise<void> {

@@ -59,15 +59,15 @@ export default async function CustomerInvoicePage({ params }: PageProps) {
             <div>
               <p className="font-medium text-charcoal">{line.description}</p>
               <p className="text-xs text-charcoal/50">
-                {line.awaitingWeight && !(line.quantity > 0)
-                  ? "Weight TBD"
+                {line.awaitingWeight
+                  ? line.quantity > 0
+                    ? `Est. ${line.quantity} ${line.unitLabel} × ${formatCents(line.unitPriceCents)} — final after weigh-in`
+                    : "Weight TBD"
                   : `${line.quantity} ${line.unitLabel} × ${formatCents(line.unitPriceCents)}`}
               </p>
             </div>
             <p className="font-medium text-charcoal">
-              {line.awaitingWeight && !(line.quantity > 0)
-                ? "—"
-                : formatCents(line.lineTotalCents)}
+              {line.awaitingWeight ? "—" : formatCents(line.lineTotalCents)}
             </p>
           </div>
         ))}

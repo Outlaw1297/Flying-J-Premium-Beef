@@ -3,13 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   adminPayInvoiceAction,
-  issueInvoiceAction,
   markInvoicePaidAction,
 } from "@/app/admin/invoice-actions";
 import { InvoiceEditor } from "@/components/admin/invoice-editor";
 import { requireAdmin } from "@/lib/admin";
 import { formatCents } from "@/lib/format";
-import { invoiceNeedsWeight } from "@/lib/invoices";
 import { prisma } from "@/lib/prisma";
 
 type PageProps = {
@@ -44,10 +42,7 @@ export default async function AdminInvoiceDetailPage({
   if (!invoice) notFound();
 
   const editable = invoice.status === "DRAFT" || invoice.status === "ISSUED";
-  const canIssue =
-    invoice.status === "DRAFT" &&
-    !invoiceNeedsWeight(invoice.lines) &&
-    invoice.totalCents > 0;
+  const canIssue = invoice.status === "DRAFT";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -82,8 +77,9 @@ export default async function AdminInvoiceDetailPage({
 
       {invoice.status === "DRAFT" ? (
         <p className="mt-4 rounded-xl border border-copper/25 bg-copper/5 px-4 py-3 text-sm text-charcoal/80">
-          Enter the hanging weight (lbs) and adjust lines, then <strong>Save</strong> and{" "}
-          <strong>Issue invoice</strong>. The customer gets an email with a pay link.
+          Enter the hanging weight (lbs) and adjust lines, then{" "}
+          <strong>Issue invoice</strong> (saves your edits and emails the customer a pay
+          link).
         </p>
       ) : null}
 
@@ -94,6 +90,7 @@ export default async function AdminInvoiceDetailPage({
           initialTaxCents={invoice.taxCents}
           initialDiscountCents={invoice.discountCents}
           editable={editable && invoice.status !== "PAID"}
+          canIssue={canIssue}
           initialLines={invoice.lines.map((l) => ({
             id: l.id,
             description: l.description,
@@ -107,18 +104,6 @@ export default async function AdminInvoiceDetailPage({
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        {canIssue ? (
-          <form action={issueInvoiceAction}>
-            <input type="hidden" name="invoiceId" value={invoice.id} />
-            <button
-              type="submit"
-              className="rounded-full bg-charcoal px-5 py-2.5 text-sm font-semibold text-cream hover:bg-charcoal/90"
-            >
-              Issue invoice &amp; email customer
-            </button>
-          </form>
-        ) : null}
-
         {invoice.status === "ISSUED" ? (
           <>
             <form action={adminPayInvoiceAction}>

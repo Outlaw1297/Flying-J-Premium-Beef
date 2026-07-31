@@ -49,7 +49,10 @@ export async function fulfillInvoiceCheckoutSession(
       ? session.payment_intent
       : session.payment_intent?.id ?? null;
 
-  const taxCents = session.total_details?.amount_tax ?? invoice.taxCents;
+  // Prefer invoice tax/discount (admin-entered or coupon) over Stripe Tax fields,
+  // which stay 0 when tax is charged as a Checkout line item.
+  const stripeTax = session.total_details?.amount_tax ?? 0;
+  const taxCents = stripeTax > 0 ? stripeTax : invoice.taxCents;
   const totalCents = session.amount_total ?? invoice.totalCents;
 
   await prisma.$transaction(async (tx) => {

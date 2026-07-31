@@ -34,12 +34,22 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   const order = await prisma.order.findFirst({
     where: { id, userId: session.user.id },
     include: {
-      items: true,
-      invoice: true,
+      items: {
+        include: {
+          product: { select: { pricingMode: true } },
+        },
+      },
+      invoice: {
+        include: {
+          lines: { orderBy: { sortOrder: "asc" } },
+        },
+      },
     },
   });
 
   if (!order) notFound();
+
+  const draftInvoice = order.invoice?.status === "DRAFT";
 
   const addressLines = [
     order.addressLine1,
@@ -159,24 +169,41 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
       <div className="mt-6 rounded-2xl border border-charcoal/10 bg-white p-6 shadow-sm">
         <h2 className="font-display text-lg font-semibold text-charcoal">Items</h2>
         <ul className="mt-4 divide-y divide-charcoal/10">
-          {order.items.map((item) => (
-            <li
-              key={item.id}
-              className="flex items-start justify-between gap-4 py-3 text-sm"
-            >
-              <span className="text-charcoal/80">
-                {item.quantity}× {item.productNameSnapshot}
-              </span>
-              <span className="font-medium text-charcoal">
-                {formatCents(item.priceCents * item.quantity)}
-              </span>
-            </li>
-          ))}
+          {order.items.map((item) => {
+            const invoiceLine = order.invoice?.lines.find(
+              (line) => line.productId === item.productId,
+            );
+            const hanging = item.product.pricingMode === "PER_POUND_HANGING";
+            const amountLabel = hanging
+              ? !invoiceLine ||
+                invoiceLine.awaitingWeight ||
+                !(invoiceLine.quantity > 0)
+                ? "TBD"
+                : formatCents(invoiceLine.lineTotalCents)
+              : formatCents(item.priceCents * item.quantity);
+
+            return (
+              <li
+                key={item.id}
+                className="flex items-start justify-between gap-4 py-3 text-sm"
+              >
+                <span className="text-charcoal/80">
+                  {item.quantity}× {item.productNameSnapshot}
+                  {hanging ? (
+                    <span className="block text-xs text-charcoal/50">
+                      Priced by hanging weight
+                    </span>
+                  ) : null}
+                </span>
+                <span className="font-medium text-charcoal">{amountLabel}</span>
+              </li>
+            );
+          })}
         </ul>
         <div className="mt-4 flex justify-between border-t border-charcoal/10 pt-4 text-sm">
           <span className="text-charcoal/70">Subtotal</span>
           <span className="font-medium text-charcoal">
-            {formatCents(order.subtotalCents)}
+            {draftInvoice ? "TBD" : formatCents(order.subtotalCents)}
           </span>
         </div>
         {order.discountCents > 0 && (
@@ -190,13 +217,13 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
         <div className="mt-2 flex justify-between text-sm">
           <span className="text-charcoal/70">Sales tax</span>
           <span className="font-medium text-charcoal">
-            {formatCents(order.taxCents)}
+            {draftInvoice ? "TBD" : formatCents(order.taxCents)}
           </span>
         </div>
         <div className="mt-2 flex justify-between text-base">
           <span className="font-semibold text-charcoal">Total</span>
           <span className="font-semibold text-charcoal">
-            {formatCents(order.totalCents)}
+            {draftInvoice ? "TBD" : formatCents(order.totalCents)}
           </span>
         </div>
       </div>

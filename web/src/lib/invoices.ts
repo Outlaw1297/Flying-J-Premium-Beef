@@ -75,10 +75,11 @@ export function buildInvoiceLinesFromCart(items: CartProductPricing[]) {
   });
 }
 
+/** True while any hanging-weight line still needs staff weigh-in confirmation. */
 export function invoiceNeedsWeight(
-  lines: Pick<InvoiceLine, "awaitingWeight" | "quantity">[],
+  lines: Pick<InvoiceLine, "awaitingWeight">[],
 ): boolean {
-  return lines.some((l) => l.awaitingWeight && !(l.quantity > 0));
+  return lines.some((l) => l.awaitingWeight);
 }
 
 export function recalculateInvoiceTotals(input: {

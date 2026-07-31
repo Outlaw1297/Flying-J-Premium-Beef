@@ -304,7 +304,6 @@ export async function createCheckoutSessionAction(
 
   // Hanging-weight / deferred invoice — submit now, pay after weigh-in
   if (paymentMethod === PaymentMethod.INVOICE) {
-    const invoiceNumber = await nextInvoiceNumber();
     const lines = buildInvoiceLinesFromCart(
       enrichedCart.map((item) => ({
         productId: item.productId,
@@ -322,10 +321,11 @@ export async function createCheckoutSessionAction(
       taxCents: 0,
     });
 
-    let order;
+    let order: { id: string; invoiceNumber: string };
     try {
       order = await prisma.$transaction(
         async (tx) => {
+          const invoiceNumber = await nextInvoiceNumber(tx);
           const created = await tx.order.create({
             data: {
               ...orderBase,
@@ -368,7 +368,7 @@ export async function createCheckoutSessionAction(
             );
           }
 
-          return created;
+          return { id: created.id, invoiceNumber };
         },
         { isolationLevel: "Serializable" },
       );
@@ -390,7 +390,7 @@ export async function createCheckoutSessionAction(
       await sendOrderReceivedEmail({
         to: checkoutUser.email,
         customerName: parsed.data.name,
-        invoiceNumber,
+        invoiceNumber: order.invoiceNumber,
         orderId: order.id,
       });
     } catch (error) {
@@ -409,7 +409,6 @@ export async function createCheckoutSessionAction(
 
   // Cash / check — place order without Stripe card charge
   if (paymentMethod !== PaymentMethod.CARD) {
-    const invoiceNumber = await nextInvoiceNumber();
     const lines = buildInvoiceLinesFromCart(
       enrichedCart.map((item) => ({
         productId: item.productId,
@@ -427,10 +426,11 @@ export async function createCheckoutSessionAction(
       taxCents: taxQuote.taxCents,
     });
 
-    let order;
+    let order: { id: string };
     try {
       order = await prisma.$transaction(
         async (tx) => {
+          const invoiceNumber = await nextInvoiceNumber(tx);
           const created = await tx.order.create({ data: orderBase });
 
           await tx.invoice.create({
