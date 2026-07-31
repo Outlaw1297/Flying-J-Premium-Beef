@@ -56,6 +56,18 @@ export async function registerAction(
     });
   }
 
+  if (newsletter) {
+    const { subscribeToNewsletter } = await import("@/lib/newsletter");
+    await subscribeToNewsletter({
+      email: emailStr,
+      source: "ACCOUNT",
+      userId:
+        existing?.id ??
+        (await prisma.user.findUnique({ where: { email: emailStr } }))?.id,
+      sendWelcome: true,
+    });
+  }
+
   try {
     await signIn("credentials", {
       email: emailStr,

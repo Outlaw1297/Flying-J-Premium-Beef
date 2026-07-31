@@ -1,6 +1,7 @@
 "use server";
 
-import { getCart } from "@/lib/cart";
+import { getCart, getCartSubtotal } from "@/lib/cart";
+import { resolveAppliedCoupon } from "@/lib/coupons";
 import { calculateSalesTax, resolveTaxAddress } from "@/lib/tax";
 
 export type TaxEstimateState = {
@@ -26,6 +27,8 @@ export async function estimateTaxAction(
     return { error: "Your cart is empty" };
   }
 
+  const applied = await resolveAppliedCoupon(getCartSubtotal(cart));
+
   const resolved = resolveTaxAddress({
     fulfillmentType,
     customerAddress: {
@@ -46,6 +49,7 @@ export async function estimateTaxAction(
       cart,
       address: resolved.address,
       addressSource: resolved.source,
+      discountCents: applied?.discountCents ?? 0,
     });
 
     return {

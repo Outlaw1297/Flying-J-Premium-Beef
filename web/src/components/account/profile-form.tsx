@@ -20,6 +20,7 @@ export function ProfileForm({
     phone: string | null;
     email: string;
     preferredFulfillment: "PICKUP" | "DELIVERY" | null;
+    newsletterSubscribed: boolean;
     addressLine1: string | null;
     addressLine2: string | null;
     city: string | null;
@@ -167,6 +168,23 @@ export function ProfileForm({
           </div>
         </div>
       </div>
+
+      <fieldset className="rounded-2xl border border-charcoal/10 bg-cream/40 p-4">
+        <legend className="px-1 text-sm font-medium text-charcoal">
+          Newsletter
+        </legend>
+        <label className="mt-2 flex items-start gap-3 text-sm text-charcoal/80">
+          <input
+            type="checkbox"
+            name="newsletter"
+            defaultChecked={user.newsletterSubscribed}
+            className="mt-1"
+          />
+          <span>
+            Email me seasonal deals, pickup updates, and coupon codes.
+          </span>
+        </label>
+      </fieldset>
 
       <button
         type="submit"

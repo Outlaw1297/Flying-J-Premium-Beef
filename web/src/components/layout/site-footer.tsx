@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NewsletterSignup } from "@/components/newsletter/newsletter-signup";
 
 export function SiteFooter() {
   return (
@@ -41,8 +42,11 @@ export function SiteFooter() {
               Stay connected
             </p>
             <p className="mt-4 text-sm text-cream/70">
-              Newsletter signup and coupon offers coming in Phase 5.
+              Get seasonal cuts, pickup updates, and exclusive coupons.
             </p>
+            <div className="mt-4">
+              <NewsletterSignup source="FOOTER" compact />
+            </div>
             <p className="mt-4 text-xs text-cream/50">
               Questions?{" "}
               <Link href="/help" className="text-copper hover:underline">
@@ -54,10 +58,14 @@ export function SiteFooter() {
 
         <div className="mt-10 flex flex-col gap-2 border-t border-cream/10 pt-6 text-xs text-cream/50 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} Flying J Premium Beef. All rights reserved.</p>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-4">
             <span>Federally Inspected</span>
-            <Link href="/help" className="hover:text-cream">Privacy</Link>
-            <Link href="/help" className="hover:text-cream">Terms</Link>
+            <Link href="/newsletter/unsubscribe" className="hover:text-cream">
+              Unsubscribe
+            </Link>
+            <Link href="/help" className="hover:text-cream">
+              Help
+            </Link>
           </div>
         </div>
       </div>

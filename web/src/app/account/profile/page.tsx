@@ -20,6 +20,7 @@ export default async function ProfilePage() {
       phone: true,
       email: true,
       preferredFulfillment: true,
+      newsletterSubscribed: true,
       addressLine1: true,
       addressLine2: true,
       city: true,

@@ -84,15 +84,22 @@ export async function calculateSalesTax(input: {
   cart: CartItem[];
   address: TaxAddress;
   addressSource: "shipping" | "billing";
+  /** Applied after subtotal, before tax (e.g. coupon). */
+  discountCents?: number;
 }): Promise<TaxQuote & { warning?: string }> {
-  const subtotalCents = input.cart.reduce(
+  const rawSubtotal = input.cart.reduce(
     (sum, item) => sum + item.priceCents * item.quantity,
     0,
   );
+  const discountCents = Math.min(
+    rawSubtotal,
+    Math.max(0, input.discountCents ?? 0),
+  );
+  const subtotalCents = rawSubtotal - discountCents;
 
   if (!process.env.STRIPE_SECRET_KEY) {
     return {
-      subtotalCents,
+      subtotalCents: rawSubtotal,
       taxCents: 0,
       totalCents: subtotalCents,
       calculationId: null,
@@ -102,7 +109,28 @@ export async function calculateSalesTax(input: {
 
   const stripe = getStripe();
 
+  // Scale line items so Stripe Tax computes on the discounted subtotal
+  const scale =
+    rawSubtotal > 0 ? (rawSubtotal - discountCents) / rawSubtotal : 1;
+
   try {
+    const lineItems = input.cart.map((item, index) => {
+      const full = item.priceCents * item.quantity;
+      return {
+        amount: Math.max(0, Math.round(full * scale)),
+        quantity: item.quantity,
+        reference: item.productId || `item-${index}`,
+        tax_code: productTaxCode(),
+      };
+    });
+
+    // Fix rounding so line amounts sum to discounted subtotal
+    const lineSum = lineItems.reduce((s, li) => s + li.amount, 0);
+    const drift = subtotalCents - lineSum;
+    if (lineItems.length > 0 && drift !== 0) {
+      lineItems[0].amount = Math.max(0, lineItems[0].amount + drift);
+    }
+
     const calculation = await stripe.tax.calculations.create({
       currency: "usd",
       customer_details: {
@@ -116,12 +144,7 @@ export async function calculateSalesTax(input: {
         },
         address_source: input.addressSource,
       },
-      line_items: input.cart.map((item, index) => ({
-        amount: item.priceCents * item.quantity,
-        quantity: item.quantity,
-        reference: item.productId || `item-${index}`,
-        tax_code: productTaxCode(),
-      })),
+      line_items: lineItems,
     });
 
     const taxCents = calculation.tax_amount_exclusive ?? 0;
@@ -134,9 +157,9 @@ export async function calculateSalesTax(input: {
     const jurisdiction = breakdown?.jurisdiction?.display_name ?? null;
 
     return {
-      subtotalCents,
+      subtotalCents: rawSubtotal,
       taxCents,
-      totalCents,
+      totalCents: totalCents,
       calculationId: calculation.id,
       jurisdiction,
     };
@@ -152,7 +175,7 @@ export async function calculateSalesTax(input: {
       message.toLowerCase().includes("head office")
     ) {
       return {
-        subtotalCents,
+        subtotalCents: rawSubtotal,
         taxCents: 0,
         totalCents: subtotalCents,
         calculationId: null,

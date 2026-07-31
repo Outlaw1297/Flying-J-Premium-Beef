@@ -1,5 +1,6 @@
 import { nextInvoiceNumber } from "@/lib/invoices";
 import { sendOrderConfirmationEmail } from "@/lib/email";
+import { recordCouponRedemption } from "@/lib/coupons";
 import { prisma } from "@/lib/prisma";
 import type Stripe from "stripe";
 
@@ -38,6 +39,8 @@ export async function fulfillCheckoutSession(
 
   const taxCents = session.total_details?.amount_tax ?? existing.taxCents;
   const totalCents = session.amount_total ?? existing.totalCents;
+  const discountCents =
+    session.total_details?.amount_discount ?? existing.discountCents;
   const invoiceNumber = await nextInvoiceNumber();
 
   await prisma.$transaction(async (tx) => {
@@ -49,6 +52,7 @@ export async function fulfillCheckoutSession(
         stripePaymentIntentId: paymentIntentId,
         taxCents,
         totalCents,
+        discountCents,
       },
     });
 
@@ -71,6 +75,19 @@ export async function fulfillCheckoutSession(
       });
     }
   });
+
+  if (existing.couponId && discountCents > 0) {
+    try {
+      await recordCouponRedemption({
+        couponId: existing.couponId,
+        orderId: existing.id,
+        userId: existing.userId,
+        discountCents,
+      });
+    } catch (error) {
+      console.error("Coupon redemption failed:", error);
+    }
+  }
 
   try {
     await sendOrderConfirmationEmail({

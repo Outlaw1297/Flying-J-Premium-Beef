@@ -73,6 +73,21 @@ export async function updateProfileAction(
     },
   });
 
+  const wantNewsletter = formData.get("newsletter") === "on";
+  const { subscribeToNewsletter, unsubscribeFromNewsletter } = await import(
+    "@/lib/newsletter"
+  );
+  if (wantNewsletter) {
+    await subscribeToNewsletter({
+      email: session.user.email!,
+      source: "ACCOUNT",
+      userId: session.user.id,
+      sendWelcome: false,
+    });
+  } else {
+    await unsubscribeFromNewsletter(session.user.email!);
+  }
+
   revalidatePath("/account");
   revalidatePath("/account/profile");
   revalidatePath("/checkout");

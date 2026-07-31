@@ -26,6 +26,31 @@ export default async function AdminPage() {
         <SyncStripeButton />
       </div>
 
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <Link
+          href="/admin/coupons"
+          className="rounded-2xl border border-charcoal/10 bg-white p-6 shadow-sm transition-colors hover:border-copper/40"
+        >
+          <h2 className="font-display text-lg font-semibold text-charcoal">
+            Coupons
+          </h2>
+          <p className="mt-2 text-sm text-charcoal/70">
+            Create codes, track redemptions, sync to Stripe.
+          </p>
+        </Link>
+        <Link
+          href="/admin/newsletters"
+          className="rounded-2xl border border-charcoal/10 bg-white p-6 shadow-sm transition-colors hover:border-copper/40"
+        >
+          <h2 className="font-display text-lg font-semibold text-charcoal">
+            Newsletter
+          </h2>
+          <p className="mt-2 text-sm text-charcoal/70">
+            View subscribers and export the list.
+          </p>
+        </Link>
+      </div>
+
       <Link href="/account" className="mt-8 inline-flex text-sm font-medium text-copper hover:underline">
         ← Back to account
       </Link>

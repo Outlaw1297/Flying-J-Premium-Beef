@@ -1,17 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { applyCouponCodeIfValid } from "@/lib/coupons";
+import { CouponField } from "@/components/cart/coupon-field";
+import { CheckoutForm } from "@/components/checkout/checkout-form";
 import { auth } from "@/lib/auth";
 import { getCart, getCartSubtotal } from "@/lib/cart";
+import { resolveAppliedCoupon } from "@/lib/coupons";
 import { formatCents } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { CheckoutForm } from "@/components/checkout/checkout-form";
 
 export const metadata: Metadata = {
   title: "Checkout",
 };
 
-export default async function CheckoutPage() {
+type CheckoutPageProps = {
+  searchParams: Promise<{ code?: string }>;
+};
+
+export default async function CheckoutPage({ searchParams }: CheckoutPageProps) {
+  const { code: codeParam } = await searchParams;
+  if (codeParam) {
+    await applyCouponCodeIfValid(codeParam);
+  }
+
   const session = await auth();
   const cart = await getCart();
   if (cart.length === 0) {
@@ -26,6 +38,7 @@ export default async function CheckoutPage() {
           phone: true,
           email: true,
           passwordHash: true,
+          newsletterSubscribed: true,
           addressLine1: true,
           addressLine2: true,
           city: true,
@@ -38,6 +51,8 @@ export default async function CheckoutPage() {
 
   const isSignedIn = Boolean(session?.user?.id && user?.passwordHash);
   const subtotal = getCartSubtotal(cart);
+  const applied = await resolveAppliedCoupon(subtotal);
+  const discountCents = applied?.discountCents ?? 0;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
@@ -72,7 +87,9 @@ export default async function CheckoutPage() {
               defaultFulfillment={user?.preferredFulfillment}
               emailLocked={isSignedIn}
               isGuestCheckout={!isSignedIn}
+              newsletterDefault={!user?.newsletterSubscribed}
               subtotalCents={subtotal}
+              discountCents={discountCents}
               defaultAddress={{
                 addressLine1: user?.addressLine1,
                 addressLine2: user?.addressLine2,
@@ -104,13 +121,29 @@ export default async function CheckoutPage() {
                 </li>
               ))}
             </ul>
-            <div className="mt-4 flex items-center justify-between border-t border-charcoal/10 pt-4">
-              <span className="text-sm font-medium text-charcoal/70">Subtotal</span>
-              <span className="text-lg font-semibold text-charcoal">
-                {formatCents(subtotal)}
-              </span>
+
+            <div className="mt-4 space-y-2 border-t border-charcoal/10 pt-4">
+              <div className="flex items-center justify-between text-sm text-charcoal/70">
+                <span>Subtotal</span>
+                <span>{formatCents(subtotal)}</span>
+              </div>
+              {discountCents > 0 && (
+                <div className="flex items-center justify-between text-sm text-copper">
+                  <span>Discount ({applied?.code})</span>
+                  <span>−{formatCents(discountCents)}</span>
+                </div>
+              )}
             </div>
-            <p className="mt-2 text-xs text-charcoal/50">
+
+            <div className="mt-4">
+              <CouponField
+                appliedCode={applied?.code}
+                discountCents={applied?.discountCents}
+                defaultCode={codeParam}
+              />
+            </div>
+
+            <p className="mt-4 text-xs text-charcoal/50">
               Sales tax is calculated from delivery address (or pickup location) —
               state and county rates via Stripe Tax.
             </p>

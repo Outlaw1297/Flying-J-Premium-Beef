@@ -17,6 +17,7 @@ export function TaxEstimatePanel({
   state,
   zip,
   subtotalCents,
+  discountCents = 0,
 }: {
   fulfillmentType: "PICKUP" | "DELIVERY";
   addressLine1: string;
@@ -25,6 +26,7 @@ export function TaxEstimatePanel({
   state: string;
   zip: string;
   subtotalCents: number;
+  discountCents?: number;
 }) {
   const [estimate, formAction, pending] = useActionState(
     estimateTaxAction,
@@ -40,6 +42,7 @@ export function TaxEstimatePanel({
 
   const taxCents = estimate.taxCents ?? null;
   const totalCents = estimate.totalCents ?? null;
+  const afterDiscount = Math.max(0, subtotalCents - discountCents);
 
   return (
     <div className="rounded-xl border border-charcoal/10 bg-cream/50 p-4">
@@ -73,6 +76,12 @@ export function TaxEstimatePanel({
           <span>Subtotal</span>
           <span>{formatCents(subtotalCents)}</span>
         </div>
+        {discountCents > 0 && (
+          <div className="flex justify-between text-copper">
+            <span>Discount</span>
+            <span>−{formatCents(discountCents)}</span>
+          </div>
+        )}
         <div className="flex justify-between text-charcoal/70">
           <span>Estimated tax</span>
           <span>{taxCents === null ? "—" : formatCents(taxCents)}</span>
@@ -81,7 +90,7 @@ export function TaxEstimatePanel({
           <span>Estimated total</span>
           <span>
             {totalCents === null
-              ? formatCents(subtotalCents)
+              ? formatCents(afterDiscount)
               : formatCents(totalCents)}
           </span>
         </div>

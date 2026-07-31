@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, UserRole } from "../src/generated/prisma/client";
+import { CouponType, PrismaClient, UserRole } from "../src/generated/prisma/client";
 import { hash } from "bcryptjs";
 
 const connectionString = process.env.DATABASE_URL;
@@ -126,6 +126,30 @@ async function main() {
       update: product,
       create: product,
     });
+  }
+
+  const welcome = await prisma.coupon.upsert({
+    where: { code: "WELCOME10" },
+    update: {},
+    create: {
+      code: "WELCOME10",
+      type: CouponType.PERCENT,
+      value: 10,
+      minOrderCents: 0,
+      campaignName: "Welcome offer",
+      active: true,
+    },
+  });
+  console.log(`Coupon ready: ${welcome.code} (10% off)`);
+
+  if (process.env.STRIPE_SECRET_KEY && !welcome.stripePromotionCodeId) {
+    try {
+      const { syncCouponToStripe } = await import("../src/lib/coupons");
+      await syncCouponToStripe(welcome);
+      console.log("WELCOME10 synced to Stripe");
+    } catch (error) {
+      console.error("WELCOME10 Stripe sync skipped:", error);
+    }
   }
 
   console.log("Seed complete.");

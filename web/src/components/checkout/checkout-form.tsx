@@ -22,7 +22,9 @@ export function CheckoutForm({
   defaultFulfillment,
   emailLocked = false,
   isGuestCheckout = false,
+  newsletterDefault = true,
   subtotalCents,
+  discountCents = 0,
 }: {
   defaultName?: string | null;
   defaultEmail?: string | null;
@@ -30,7 +32,9 @@ export function CheckoutForm({
   defaultFulfillment?: "PICKUP" | "DELIVERY" | null;
   emailLocked?: boolean;
   isGuestCheckout?: boolean;
+  newsletterDefault?: boolean;
   subtotalCents: number;
+  discountCents?: number;
   defaultAddress?: {
     addressLine1?: string | null;
     addressLine2?: string | null;
@@ -363,6 +367,7 @@ export function CheckoutForm({
         state={addrState}
         zip={zip}
         subtotalCents={subtotalCents}
+        discountCents={discountCents}
       />
 
       <div>
@@ -378,6 +383,18 @@ export function CheckoutForm({
           className={inputClass}
         />
       </div>
+
+      <label className="flex items-start gap-3 text-sm text-charcoal/80">
+        <input
+          type="checkbox"
+          name="newsletter"
+          defaultChecked={newsletterDefault}
+          className="mt-1"
+        />
+        <span>
+          Email me newsletters, seasonal deals, and coupons. Unsubscribe anytime.
+        </span>
+      </label>
 
       <button
         type="submit"

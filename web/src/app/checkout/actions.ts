@@ -5,6 +5,13 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getCart, getCartSubtotal, setCart, type CartItem } from "@/lib/cart";
 import { resolveCheckoutUser } from "@/lib/checkout-user";
+import {
+  recordCouponRedemption,
+  resolveAppliedCoupon,
+  setAppliedCouponCode,
+  syncCouponToStripe,
+} from "@/lib/coupons";
+import { subscribeToNewsletter } from "@/lib/newsletter";
 import { getAppUrl, getStripe } from "@/lib/stripe";
 import { nextInvoiceNumber } from "@/lib/invoices";
 import { formatPhoneDisplay, normalizeUsPhone } from "@/lib/phone";
@@ -144,6 +151,9 @@ export async function createCheckoutSessionAction(
   }
 
   const subtotalCents = getCartSubtotal(cart);
+  const appliedCoupon = await resolveAppliedCoupon(subtotalCents);
+  const discountCents = appliedCoupon?.discountCents ?? 0;
+
   const fulfillmentType =
     parsed.data.fulfillmentType === "DELIVERY"
       ? FulfillmentType.DELIVERY
@@ -194,6 +204,7 @@ export async function createCheckoutSessionAction(
       cart,
       address: taxResolved.address,
       addressSource: taxResolved.source,
+      discountCents,
     });
   } catch {
     return { error: "Unable to calculate sales tax. Please try again." };
@@ -221,14 +232,24 @@ export async function createCheckoutSessionAction(
     };
   }
 
+  if (formData.get("newsletter") === "on") {
+    await subscribeToNewsletter({
+      email: checkoutUser.email,
+      source: "CHECKOUT",
+      userId: checkoutUser.userId,
+      sendWelcome: true,
+    });
+  }
+
   const orderBase = {
     userId: checkoutUser.userId,
     status: "PENDING" as const,
     paymentMethod,
     subtotalCents,
-    discountCents: 0,
+    discountCents,
     taxCents: taxQuote.taxCents,
     totalCents: taxQuote.totalCents,
+    couponId: appliedCoupon?.coupon.id ?? null,
     fulfillmentType,
     pickupDate,
     notes: emptyToNull(parsed.data.notes),
@@ -267,7 +288,17 @@ export async function createCheckoutSessionAction(
       return created;
     });
 
+    if (appliedCoupon) {
+      await recordCouponRedemption({
+        couponId: appliedCoupon.coupon.id,
+        orderId: order.id,
+        userId: checkoutUser.userId,
+        discountCents,
+      });
+    }
+
     await setCart([]);
+    await setAppliedCouponCode(null);
     redirect(
       `/checkout/success?order_id=${order.id}${
         checkoutUser.isGuest ? "&guest=1" : ""
@@ -345,6 +376,24 @@ export async function createCheckoutSessionAction(
     }
 
     const successGuest = checkoutUser.isGuest ? "&guest=1" : "";
+
+    let promotionCodeId = appliedCoupon?.coupon.stripePromotionCodeId ?? null;
+    if (appliedCoupon && !promotionCodeId) {
+      try {
+        promotionCodeId = await syncCouponToStripe(appliedCoupon.coupon);
+      } catch (error) {
+        console.error("Coupon Stripe sync failed:", error);
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { status: "CANCELLED" },
+        });
+        return {
+          error:
+            "Unable to apply coupon to card checkout. Try again or choose cash/check.",
+        };
+      }
+    }
+
     checkoutSession = await stripe.checkout.sessions.create({
       mode: "payment",
       customer: customer.id,
@@ -354,12 +403,17 @@ export async function createCheckoutSessionAction(
         shipping: "auto",
       },
       line_items: lineItems,
+      ...(promotionCodeId
+        ? { discounts: [{ promotion_code: promotionCodeId }] }
+        : {}),
       metadata: {
         orderId: order.id,
         userId: checkoutUser.userId,
         fulfillmentType: fulfillmentType,
         paymentMethod: "CARD",
         taxCalculationId: taxQuote.calculationId ?? "",
+        couponId: appliedCoupon?.coupon.id ?? "",
+        discountCents: String(discountCents),
       },
       success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}${successGuest}`,
       cancel_url: `${appUrl}/checkout/cancel?order_id=${order.id}`,
@@ -394,4 +448,5 @@ export async function createCheckoutSessionAction(
 
 export async function clearCartAfterCheckout(): Promise<void> {
   await setCart([]);
+  await setAppliedCouponCode(null);
 }
