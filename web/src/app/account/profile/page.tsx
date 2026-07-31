@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ProfileForm } from "@/components/account/profile-form";
+import { ChangePasswordForm } from "@/components/account/change-password-form";
 
 export const metadata: Metadata = {
   title: "Profile",
@@ -44,6 +45,18 @@ export default async function ProfilePage() {
       </p>
       <div className="mt-8 rounded-2xl border border-charcoal/10 bg-white p-6 shadow-sm">
         <ProfileForm user={user} />
+      </div>
+
+      <div className="mt-8 rounded-2xl border border-charcoal/10 bg-white p-6 shadow-sm">
+        <h2 className="font-display text-xl font-semibold text-charcoal">
+          Change password
+        </h2>
+        <p className="mt-1 text-sm text-charcoal/60">
+          Use a password at least 8 characters long.
+        </p>
+        <div className="mt-4">
+          <ChangePasswordForm />
+        </div>
       </div>
     </div>
   );

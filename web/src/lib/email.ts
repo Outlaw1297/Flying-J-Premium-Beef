@@ -164,3 +164,90 @@ export async function sendInvoiceIssuedEmail(input: {
     }),
   });
 }
+
+async function sendAuthEmail(input: {
+  to: string;
+  subject: string;
+  html: string;
+  skipLog: string;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY ?? process.env.EMAIL_API_KEY;
+  const from =
+    process.env.EMAIL_FROM ?? "Flying J Premium Beef <onboarding@resend.dev>";
+
+  if (!apiKey) {
+    console.info(`[email skipped] ${input.skipLog} for ${input.to}`);
+    return;
+  }
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [input.to],
+      subject: input.subject,
+      html: input.html,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("Auth email failed:", text);
+  }
+}
+
+export async function sendPasswordResetEmail(input: {
+  to: string;
+  name: string | null;
+  resetUrl: string;
+}): Promise<void> {
+  const html = `
+    <div style="font-family: Georgia, serif; color: #1c1917;">
+      <h1 style="font-size: 22px;">Reset your password</h1>
+      <p>Hi ${input.name ?? "there"},</p>
+      <p>We received a request to reset your Flying J Premium Beef password.</p>
+      <p><a href="${input.resetUrl}" style="display:inline-block;background:#b45309;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none;font-weight:600;">Choose a new password</a></p>
+      <p style="color:#78716c;font-size:13px;">This link expires in 1 hour. If you didn&apos;t ask for a reset, you can ignore this email.</p>
+    </div>
+  `;
+  await sendAuthEmail({
+    to: input.to,
+    subject: "Reset your Flying J Premium Beef password",
+    html,
+    skipLog: `Password reset`,
+  });
+}
+
+export async function sendAccountCreatedEmail(input: {
+  to: string;
+  name: string | null;
+  role: string;
+  tempPassword?: string;
+  loginUrl: string;
+}): Promise<void> {
+  const roleLabel = input.role === "ADMIN" ? "staff admin" : "customer";
+  const passwordBlock = input.tempPassword
+    ? `<p>Temporary password: <strong style="font-family:monospace">${input.tempPassword}</strong></p>
+       <p style="color:#78716c;font-size:13px;">Sign in and change this password right away.</p>`
+    : `<p>Use <a href="${getAppUrl()}/forgot-password">forgot password</a> if you need to set a password.</p>`;
+
+  const html = `
+    <div style="font-family: Georgia, serif; color: #1c1917;">
+      <h1 style="font-size: 22px;">Your account is ready</h1>
+      <p>Hi ${input.name ?? "there"},</p>
+      <p>A Flying J Premium Beef ${roleLabel} account was created for <strong>${input.to}</strong>.</p>
+      ${passwordBlock}
+      <p><a href="${input.loginUrl}" style="display:inline-block;background:#1c1917;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none;font-weight:600;">Sign in</a></p>
+    </div>
+  `;
+  await sendAuthEmail({
+    to: input.to,
+    subject: "Your Flying J Premium Beef account",
+    html,
+    skipLog: `Account created (${input.role})`,
+  });
+}
