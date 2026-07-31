@@ -66,7 +66,11 @@ export default function RootLayout({
   const crispId = process.env.NEXT_PUBLIC_CRISP_WEBSITE_ID?.trim() ?? "";
 
   return (
-    <html lang="en" className={`${display.variable} ${sans.variable} h-full`}>
+    <html
+      lang="en"
+      data-scroll-behavior="smooth"
+      className={`${display.variable} ${sans.variable} h-full`}
+    >
       <body className="min-h-full flex flex-col font-sans antialiased text-charcoal bg-cream">
         <AuthProvider>
           <SiteShell>{children}</SiteShell>
