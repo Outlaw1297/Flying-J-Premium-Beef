@@ -28,6 +28,20 @@ export default async function NewSupportTicketPage({ searchParams }: PageProps) 
     include: { invoice: true },
   });
 
+  // Ensure prefilled order from "Get help" is always in the select options
+  if (orderId && !orders.some((o) => o.id === orderId)) {
+    const linked = await prisma.order.findFirst({
+      where: { id: orderId, userId: session.user.id },
+      include: { invoice: true },
+    });
+    if (linked) {
+      orders.unshift(linked);
+    }
+  }
+
+  const validDefaultOrderId =
+    orderId && orders.some((o) => o.id === orderId) ? orderId : null;
+
   const orderOptions = orders.map((o) => ({
     id: o.id,
     label: `${o.invoice?.invoiceNumber ?? o.id.slice(-8)} · ${o.createdAt.toLocaleDateString()} · ${o.status}`,
@@ -50,7 +64,7 @@ export default async function NewSupportTicketPage({ searchParams }: PageProps) 
       <div className="mt-8 rounded-2xl border border-charcoal/10 bg-white p-6 shadow-sm">
         <NewTicketForm
           orders={orderOptions}
-          defaultOrderId={orderId}
+          defaultOrderId={validDefaultOrderId}
           defaultSubject={subject}
         />
       </div>

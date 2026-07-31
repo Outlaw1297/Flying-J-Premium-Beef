@@ -25,7 +25,11 @@ export default async function AccountSupportPage() {
     orderBy: { updatedAt: "desc" },
     include: {
       order: { include: { invoice: true } },
-      messages: { orderBy: { createdAt: "desc" }, take: 1 },
+      messages: {
+        where: { isInternal: false },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
     },
   });
 

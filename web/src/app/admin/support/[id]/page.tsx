@@ -132,7 +132,7 @@ export default async function AdminTicketDetailPage({ params }: PageProps) {
       </ol>
 
       <div className="mt-8 rounded-2xl border border-charcoal/10 bg-white p-5 shadow-sm">
-        <TicketReplyForm ticketId={ticket.id} isAdmin />
+        <TicketReplyForm ticketId={ticket.id} isAdmin currentStatus={ticket.status} />
       </div>
     </div>
   );

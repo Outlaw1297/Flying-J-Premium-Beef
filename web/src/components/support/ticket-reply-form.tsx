@@ -14,9 +14,11 @@ const inputClass =
 export function TicketReplyForm({
   ticketId,
   isAdmin = false,
+  currentStatus = "OPEN",
 }: {
   ticketId: string;
   isAdmin?: boolean;
+  currentStatus?: "OPEN" | "PENDING" | "RESOLVED";
 }) {
   const [state, formAction, pending] = useActionState(
     replySupportTicketAction,
@@ -61,7 +63,7 @@ export function TicketReplyForm({
             Status
             <select
               name="status"
-              defaultValue="PENDING"
+              defaultValue={currentStatus}
               className="rounded-lg border border-charcoal/15 bg-white px-2 py-1"
             >
               <option value="OPEN">Open</option>

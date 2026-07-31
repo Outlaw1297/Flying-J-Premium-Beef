@@ -150,8 +150,9 @@ export async function replySupportTicketAction(
             ? SupportTicketStatus.OPEN
             : undefined
       : !isAdmin
-        ? SupportTicketStatus.OPEN
-        : SupportTicketStatus.PENDING;
+        ? // Customer reply reopens for staff attention
+          SupportTicketStatus.OPEN
+        : undefined;
 
   await prisma.$transaction([
     prisma.supportMessage.create({
