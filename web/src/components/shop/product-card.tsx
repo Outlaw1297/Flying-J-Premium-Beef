@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { formatCents } from "@/lib/format";
 import { categoryLabel } from "@/lib/categories";
+import { ProductMedia } from "@/components/shop/product-media";
+import { ArrowRightIcon } from "@/components/ui/brand-icons";
 
 type ProductCardProps = {
   id: string;
@@ -15,13 +17,6 @@ type ProductCardProps = {
   pricingMode?: "FIXED" | "PER_POUND_HANGING" | null;
 };
 
-const categoryGradients: Record<string, string> = {
-  steaks: "from-charcoal to-charcoal/70",
-  ground: "from-copper/80 to-charcoal",
-  roasts: "from-charcoal/90 to-copper/60",
-  bundles: "from-copper to-charcoal",
-};
-
 export function ProductCard({
   slug,
   name,
@@ -33,59 +28,58 @@ export function ProductCard({
   imageUrl,
   pricingMode,
 }: ProductCardProps) {
-  const gradient =
-    categoryGradients[category ?? ""] ?? "from-charcoal/80 to-copper/70";
   const outOfStock = inventoryCount === 0;
 
   return (
     <Link
       href={`/shop/${slug}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-charcoal/10 bg-white shadow-sm transition-shadow hover:shadow-md"
+      aria-label={`View ${name}`}
+      className="group flex flex-col overflow-hidden rounded-[1.35rem] border border-charcoal/10 bg-white transition-all duration-300 hover:-translate-y-1 hover:border-charcoal/15 hover:shadow-[0_24px_55px_rgba(34,34,34,0.1)]"
     >
-      <div
-        className={`relative flex h-40 items-end overflow-hidden bg-gradient-to-br p-4 ${gradient}`}
-      >
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imageUrl}
-            alt={name}
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-          />
-        ) : null}
-        <span
-          className={`relative z-10 text-xs font-semibold uppercase tracking-wider ${
-            imageUrl ? "rounded bg-charcoal/70 px-2 py-1 text-cream" : "text-cream/80"
-          }`}
-        >
+      <div className="relative aspect-[4/3] overflow-hidden">
+        <ProductMedia
+          imageUrl={imageUrl}
+          name={name}
+          category={category}
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+          className="h-full"
+        />
+        <span className="absolute left-4 top-4 rounded-full border border-white/15 bg-charcoal/65 px-3 py-1.5 text-[0.58rem] font-bold uppercase tracking-[0.16em] text-white backdrop-blur-md">
           {categoryLabel(category)}
         </span>
-        {outOfStock && (
-          <span className="absolute right-3 top-3 z-10 rounded-full bg-cream/90 px-2.5 py-1 text-xs font-semibold text-charcoal">
+        {outOfStock ? (
+          <span className="absolute right-4 top-4 rounded-full bg-cream px-3 py-1.5 text-[0.62rem] font-bold uppercase tracking-[0.1em] text-charcoal">
             Out of stock
           </span>
-        )}
+        ) : null}
       </div>
-      <div className="flex flex-1 flex-col p-4">
-        <h2 className="font-display text-lg font-semibold text-charcoal group-hover:text-copper transition-colors">
+      <div className="flex flex-1 flex-col p-5 sm:p-6">
+        <h2 className="font-display text-xl font-semibold tracking-[-0.025em] text-charcoal transition-colors group-hover:text-forest">
           {name}
         </h2>
         {description && (
-          <p className="mt-1 line-clamp-2 text-sm text-charcoal/60">{description}</p>
+          <p className="mt-2 line-clamp-2 text-sm leading-6 text-charcoal/56">
+            {description}
+          </p>
         )}
-        <div className="mt-4 flex items-end justify-between gap-2">
+        <div className="mt-5 flex items-end justify-between gap-3 border-t border-charcoal/8 pt-4">
           <div>
-            <p className="text-lg font-semibold text-charcoal">
+            <p className="text-lg font-bold tracking-[-0.02em] text-charcoal">
               {formatCents(priceCents)}
               {pricingMode === "PER_POUND_HANGING" ? (
-                <span className="text-sm font-normal text-charcoal/50"> / lb hanging</span>
+                <span className="text-xs font-medium text-charcoal/45">
+                  {" "}
+                  / lb hanging
+                </span>
               ) : null}
             </p>
             {weightLabel && (
-              <p className="text-xs text-charcoal/50">{weightLabel}</p>
+              <p className="mt-0.5 text-xs text-charcoal/45">{weightLabel}</p>
             )}
           </div>
-          <span className="text-sm font-medium text-copper">View →</span>
+          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-charcoal/12 text-forest transition-all group-hover:border-forest group-hover:bg-forest group-hover:text-white">
+            <ArrowRightIcon className="h-4 w-4" />
+          </span>
         </div>
       </div>
     </Link>

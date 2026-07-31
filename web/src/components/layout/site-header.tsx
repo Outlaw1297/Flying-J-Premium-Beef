@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { getCartItemCount } from "@/lib/cart";
+import { BrandLogo } from "@/components/ui/brand-logo";
+import { CartIcon, UserIcon } from "@/components/ui/brand-icons";
 
 const navLinks = [
-  { href: "/shop", label: "Shop" },
-  { href: "/about", label: "About" },
-  { href: "/help", label: "Help" },
+  { href: "/shop", label: "Shop beef" },
+  { href: "/#beef-shares", label: "Beef shares" },
+  { href: "/cuts", label: "Explore cuts" },
+  { href: "/recipes", label: "Recipes" },
+  { href: "/about", label: "Our ranch" },
 ];
 
 export async function SiteHeader() {
@@ -13,63 +17,53 @@ export async function SiteHeader() {
   const cartCount = await getCartItemCount();
 
   return (
-    <header className="sticky top-0 z-50 border-b border-charcoal/10 bg-cream/95 backdrop-blur-sm">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" className="group flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-charcoal text-sm font-bold text-cream">
-            FJ
-          </span>
-          <div className="leading-tight">
-            <span className="font-display text-lg font-semibold tracking-tight text-charcoal group-hover:text-copper transition-colors">
-              Flying J
-            </span>
-            <span className="block text-xs font-medium uppercase tracking-widest text-charcoal/60">
-              Premium Beef
-            </span>
-          </div>
-        </Link>
-
-        <nav className="hidden items-center gap-6 md:flex">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-sm font-medium text-charcoal/80 hover:text-copper transition-colors"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Link
-            href="/cart"
-            className="hidden items-center gap-1.5 rounded-full border border-charcoal/15 px-3 py-1.5 text-sm font-medium text-charcoal hover:border-copper hover:text-copper transition-colors sm:inline-flex"
-          >
-            Cart
-            {cartCount > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-copper px-1.5 text-xs font-semibold text-cream">
-                {cartCount}
-              </span>
-            )}
-          </Link>
-          {session?.user ? (
-            <Link
-              href="/account"
-              className="rounded-full bg-charcoal px-4 py-2 text-sm font-medium text-cream hover:bg-charcoal/90 transition-colors"
-            >
-              Account
-            </Link>
-          ) : (
-            <Link
-              href="/login"
-              className="rounded-full bg-charcoal px-4 py-2 text-sm font-medium text-cream hover:bg-charcoal/90 transition-colors"
-            >
-              Sign in
-            </Link>
-          )}
-        </div>
+    <>
+      <div className="relative z-[60] bg-forest px-4 py-2 text-center text-[0.65rem] font-bold uppercase tracking-[0.17em] text-cream sm:text-xs">
+        <p>USDA inspected · Family owned · Ranch raised in North Dakota</p>
       </div>
-    </header>
+      <header className="sticky top-0 z-50 border-b border-charcoal/10 bg-cream/95 backdrop-blur-xl">
+        <div className="section-shell flex h-[4.75rem] items-center justify-between gap-4">
+          <BrandLogo />
+
+          <nav
+            aria-label="Primary navigation"
+            className="hidden items-center gap-7 lg:flex"
+          >
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="relative py-3 text-[0.78rem] font-bold uppercase tracking-[0.11em] text-charcoal/75 transition-colors after:absolute after:inset-x-0 after:bottom-1 after:h-px after:origin-left after:scale-x-0 after:bg-copper after:transition-transform hover:text-charcoal hover:after:scale-x-100"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Link
+              href={session?.user ? "/account" : "/login"}
+              aria-label={session?.user ? "Open account" : "Sign in"}
+              className="hidden h-11 w-11 items-center justify-center rounded-full text-charcoal transition-colors hover:bg-white sm:inline-flex"
+            >
+              <UserIcon className="h-5 w-5" />
+            </Link>
+            <Link
+              href="/cart"
+              aria-label={`Cart with ${cartCount} item${cartCount === 1 ? "" : "s"}`}
+              className="relative inline-flex h-11 items-center gap-2 rounded-full border border-charcoal/15 bg-white px-4 text-sm font-semibold text-charcoal transition-all hover:border-copper hover:text-copper"
+            >
+              <CartIcon className="h-5 w-5" />
+              <span className="hidden sm:inline">Cart</span>
+              {cartCount > 0 ? (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-copper px-1.5 text-[0.65rem] font-bold text-white">
+                  {cartCount}
+                </span>
+              ) : null}
+            </Link>
+          </div>
+        </div>
+      </header>
+    </>
   );
 }
