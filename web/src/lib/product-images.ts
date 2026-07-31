@@ -5,10 +5,15 @@ import path from "path";
 const MAX_BYTES = 2.5 * 1024 * 1024;
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
+function toDataUrl(mimeType: string, buffer: Buffer): string {
+  return `data:${mimeType};base64,${buffer.toString("base64")}`;
+}
+
 /**
- * Persist an uploaded product image.
  * Prefer writing under public/uploads (served as static files).
- * Fall back to a data URL stored in the DB when the filesystem is read-only.
+ * On ephemeral hosts (e.g. Render without a persistent disk) writes succeed
+ * but are wiped on deploy — store a data URL in the DB instead.
+ * Also fall back to a data URL when the filesystem is read-only.
  */
 export async function saveProductImage(
   file: File,
@@ -33,6 +38,13 @@ export async function saveProductImage(
           : "jpg";
 
   const buffer = Buffer.from(await file.arrayBuffer());
+
+  // RENDER is always "true" on Render; local disk there is ephemeral unless a
+  // persistent disk is attached (this app's Blueprint does not attach one).
+  if (process.env.RENDER) {
+    return { imageUrl: toDataUrl(file.type, buffer) };
+  }
+
   const filename = `${Date.now()}-${randomBytes(6).toString("hex")}.${ext}`;
 
   try {
@@ -42,9 +54,7 @@ export async function saveProductImage(
     return { imageUrl: `/uploads/products/${filename}` };
   } catch (error) {
     console.warn("Filesystem upload failed, storing as data URL:", error);
-    // Persist across deploys on ephemeral hosts (Render free) via DB column
-    const dataUrl = `data:${file.type};base64,${buffer.toString("base64")}`;
-    return { imageUrl: dataUrl };
+    return { imageUrl: toDataUrl(file.type, buffer) };
   }
 }
 

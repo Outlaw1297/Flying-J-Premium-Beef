@@ -35,9 +35,12 @@ export async function syncProductToStripe(
 
   let stripeProductId = product.stripeProductId;
 
+  // Stripe only accepts http(s) image URLs. Pass [] (not undefined) so updates
+  // clear a previously synced HTTPS image when the shop now stores a local
+  // upload path or data URL.
   const stripeImages = isHttpImageUrl(product.imageUrl)
     ? [product.imageUrl!]
-    : undefined;
+    : [];
 
   if (stripeProductId) {
     await stripe.products.update(stripeProductId, {
