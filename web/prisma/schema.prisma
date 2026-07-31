@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  READY
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum FulfillmentType {
+  PICKUP
+  DELIVERY
+}
+
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+enum NewsletterStatus {
+  ACTIVE
+  UNSUBSCRIBED
+}
+
+enum NewsletterSource {
+  FOOTER
+  CHECKOUT
+  POPUP
+  ACCOUNT
+}
+
+enum SupportTicketStatus {
+  OPEN
+  PENDING
+  RESOLVED
+}
+
+enum SupportPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+enum AuthorType {
+  CUSTOMER
+  STAFF
+}
+
+model User {
+  id                   String   @id @default(cuid())
+  email                String   @unique
+  passwordHash         String   @map("password_hash")
+  name                 String?
+  phone                String?
+  role                 UserRole @default(CUSTOMER)
+  newsletterSubscribed Boolean  @default(false) @map("newsletter_subscribed")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  orders              Order[]
+  couponRedemptions   CouponRedemption[]
+  newsletterSubscriber NewsletterSubscriber?
+  supportTickets      SupportTicket[]
+  supportMessages     SupportMessage[]
+
+  @@map("users")
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  name           String
+  slug           String   @unique
+  description    String?
+  priceCents     Int      @map("price_cents")
+  weightLabel    String?  @map("weight_label")
+  inventoryCount Int      @default(0) @map("inventory_count")
+  imageUrl       String?  @map("image_url")
+  active         Boolean  @default(true)
+  category       String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  orderItems OrderItem[]
+
+  @@map("products")
+}
+
+model Order {
+  id                    String          @id @default(cuid())
+  userId                String          @map("user_id")
+  status                OrderStatus     @default(PENDING)
+  stripeSessionId       String?         @unique @map("stripe_session_id")
+  stripePaymentIntentId String?         @map("stripe_payment_intent_id")
+  subtotalCents         Int             @map("subtotal_cents")
+  discountCents         Int             @default(0) @map("discount_cents")
+  taxCents              Int             @default(0) @map("tax_cents")
+  totalCents            Int             @map("total_cents")
+  fulfillmentType       FulfillmentType @default(PICKUP) @map("fulfillment_type")
+  pickupDate            DateTime?       @map("pickup_date")
+  notes                 String?
+  couponId              String?         @map("coupon_id")
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  user              User               @relation(fields: [userId], references: [id])
+  coupon            Coupon?            @relation(fields: [couponId], references: [id])
+  items             OrderItem[]
+  invoice           Invoice?
+  couponRedemptions CouponRedemption[]
+  supportTickets    SupportTicket[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id                  String @id @default(cuid())
+  orderId             String @map("order_id")
+  productId           String @map("product_id")
+  quantity            Int
+  priceCents          Int    @map("price_cents")
+  productNameSnapshot String @map("product_name_snapshot")
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  orderId         String   @unique @map("order_id")
+  invoiceNumber   String   @unique @map("invoice_number")
+  stripeInvoiceId String?  @map("stripe_invoice_id")
+  pdfUrl          String?  @map("pdf_url")
+  issuedAt        DateTime @default(now()) @map("issued_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
+}
+
+model Coupon {
+  id                    String     @id @default(cuid())
+  code                  String     @unique
+  stripePromotionCodeId String?    @map("stripe_promotion_code_id")
+  type                  CouponType
+  value                 Int
+  minOrderCents         Int        @default(0) @map("min_order_cents")
+  maxUses               Int?       @map("max_uses")
+  usesCount             Int        @default(0) @map("uses_count")
+  expiresAt             DateTime?  @map("expires_at")
+  active                Boolean    @default(true)
+  campaignName          String?    @map("campaign_name")
+  createdAt             DateTime   @default(now()) @map("created_at")
+  updatedAt             DateTime   @updatedAt @map("updated_at")
+
+  orders      Order[]
+  redemptions CouponRedemption[]
+
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id           String   @id @default(cuid())
+  couponId     String   @map("coupon_id")
+  orderId      String   @map("order_id")
+  userId       String   @map("user_id")
+  discountCents Int     @map("discount_cents")
+  redeemedAt   DateTime @default(now()) @map("redeemed_at")
+
+  coupon Coupon @relation(fields: [couponId], references: [id])
+  order  Order  @relation(fields: [orderId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@map("coupon_redemptions")
+}
+
+model NewsletterSubscriber {
+  id              String           @id @default(cuid())
+  email           String           @unique
+  userId          String?          @unique @map("user_id")
+  status          NewsletterStatus @default(ACTIVE)
+  source          NewsletterSource @default(FOOTER)
+  subscribedAt    DateTime         @default(now()) @map("subscribed_at")
+  unsubscribedAt  DateTime?        @map("unsubscribed_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("newsletter_subscribers")
+}
+
+model SupportTicket {
+  id        String              @id @default(cuid())
+  userId    String              @map("user_id")
+  orderId   String?             @map("order_id")
+  subject   String
+  status    SupportTicketStatus @default(OPEN)
+  priority  SupportPriority     @default(NORMAL)
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  user     User             @relation(fields: [userId], references: [id])
+  order    Order?           @relation(fields: [orderId], references: [id])
+  messages SupportMessage[]
+
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id         String     @id @default(cuid())
+  ticketId   String     @map("ticket_id")
+  authorType AuthorType @map("author_type")
+  authorId   String?    @map("author_id")
+  body       String
+  isInternal Boolean    @default(false) @map("is_internal")
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User?         @relation(fields: [authorId], references: [id])
+
+  @@map("support_messages")
+}

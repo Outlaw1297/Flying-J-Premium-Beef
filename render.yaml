@@ -1,0 +1,31 @@
+databases:
+  - name: flying-j-db
+    plan: free
+    databaseName: flying_j_beef
+    user: flying_j
+
+services:
+  - type: web
+    name: flying-j-beef
+    runtime: node
+    rootDir: web
+    plan: free
+    buildCommand: npm install && npx prisma migrate deploy && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: flying-j-db
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: NEXTAUTH_SECRET
+        fromService:
+          name: flying-j-beef
+          type: web
+          envVarKey: AUTH_SECRET
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: NODE_ENV
+        value: production
