@@ -8,6 +8,7 @@ import { getAppUrl, getStripe } from "@/lib/stripe";
 import { nextInvoiceNumber } from "@/lib/invoices";
 import { formatPhoneDisplay, normalizeUsPhone } from "@/lib/phone";
 import { calculateSalesTax, productTaxCode, resolveTaxAddress } from "@/lib/tax";
+import { ensureProductSynced } from "@/lib/stripe-products";
 import { prisma } from "@/lib/prisma";
 import { FulfillmentType, PaymentMethod } from "@/generated/prisma/enums";
 
@@ -310,6 +311,28 @@ export async function createCheckoutSessionAction(
       metadata: { userId: session.user.id },
     });
 
+    const lineItems = [];
+    for (const item of cart) {
+      const priceId = await ensureProductSynced(item.productId);
+      if (priceId) {
+        lineItems.push({ price: priceId, quantity: item.quantity });
+      } else {
+        // Fallback if Stripe catalog sync unavailable
+        lineItems.push({
+          quantity: item.quantity,
+          price_data: {
+            currency: "usd" as const,
+            unit_amount: item.priceCents,
+            product_data: {
+              name: item.name,
+              description: item.weightLabel ?? undefined,
+              tax_code: productTaxCode(),
+            },
+          },
+        });
+      }
+    }
+
     checkoutSession = await stripe.checkout.sessions.create({
       mode: "payment",
       customer: customer.id,
@@ -318,18 +341,7 @@ export async function createCheckoutSessionAction(
         address: "auto",
         shipping: "auto",
       },
-      line_items: cart.map((item) => ({
-        quantity: item.quantity,
-        price_data: {
-          currency: "usd",
-          unit_amount: item.priceCents,
-          product_data: {
-            name: item.name,
-            description: item.weightLabel ?? undefined,
-            tax_code: productTaxCode(),
-          },
-        },
-      })),
+      line_items: lineItems,
       metadata: {
         orderId: order.id,
         userId: session.user.id,

@@ -129,6 +129,15 @@ async function main() {
   }
 
   console.log("Seed complete.");
+
+  if (process.env.STRIPE_SECRET_KEY) {
+    const { syncAllProductsToStripe } = await import("../src/lib/stripe-products");
+    const result = await syncAllProductsToStripe();
+    console.log(`Stripe catalog sync: ${result.synced} ok, ${result.failed} failed`);
+    for (const err of result.errors) console.error(" -", err);
+  } else {
+    console.log("STRIPE_SECRET_KEY not set — skipped Stripe product sync");
+  }
 }
 
 main()

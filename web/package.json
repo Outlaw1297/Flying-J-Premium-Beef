@@ -9,7 +9,8 @@
     "postinstall": "prisma generate",
     "lint": "eslint",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:sync-stripe": "tsx scripts/sync-stripe-products.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

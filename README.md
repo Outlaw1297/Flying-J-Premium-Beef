@@ -47,6 +47,19 @@ Sales tax uses **Stripe Tax** so rates follow the customer’s delivery address 
 
 Product tax code defaults to `txcd_40060003` (fresh meat / poultry). Override with `STRIPE_PRODUCT_TAX_CODE` if needed.
 
+### Stripe product catalog sync
+
+The website database is the source of truth. Products are mirrored to Stripe Products/Prices:
+
+```bash
+cd web
+npm run db:sync-stripe
+```
+
+Or (as admin, while signed in) `POST /api/admin/sync-stripe-products`.
+
+Checkout prefers Stripe Price IDs; it falls back to inline prices if sync is missing.
+
 ### Stripe webhook
 
 In [Stripe Dashboard → Webhooks](https://dashboard.stripe.com/test/webhooks), add endpoint:
