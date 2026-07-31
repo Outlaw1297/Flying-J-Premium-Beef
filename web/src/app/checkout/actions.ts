@@ -7,6 +7,7 @@ import { getCart, getCartSubtotal, setCart, type CartItem } from "@/lib/cart";
 import { getAppUrl, getStripe } from "@/lib/stripe";
 import { nextInvoiceNumber } from "@/lib/invoices";
 import { formatPhoneDisplay, normalizeUsPhone } from "@/lib/phone";
+import { calculateSalesTax, productTaxCode, resolveTaxAddress } from "@/lib/tax";
 import { prisma } from "@/lib/prisma";
 import { FulfillmentType, PaymentMethod } from "@/generated/prisma/enums";
 
@@ -168,6 +169,32 @@ export async function createCheckoutSessionAction(
     deliveryInstructions: emptyToNull(parsed.data.deliveryInstructions),
   };
 
+  const taxResolved = resolveTaxAddress({
+    fulfillmentType: parsed.data.fulfillmentType,
+    customerAddress: {
+      line1: addressFields.addressLine1 ?? undefined,
+      line2: addressFields.addressLine2,
+      city: addressFields.city ?? undefined,
+      state: addressFields.state ?? undefined,
+      postalCode: addressFields.zip ?? undefined,
+    },
+  });
+
+  if ("error" in taxResolved) {
+    return { error: taxResolved.error };
+  }
+
+  let taxQuote;
+  try {
+    taxQuote = await calculateSalesTax({
+      cart,
+      address: taxResolved.address,
+      addressSource: taxResolved.source,
+    });
+  } catch {
+    return { error: "Unable to calculate sales tax. Please try again." };
+  }
+
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
@@ -192,8 +219,8 @@ export async function createCheckoutSessionAction(
     paymentMethod,
     subtotalCents,
     discountCents: 0,
-    taxCents: 0,
-    totalCents: subtotalCents,
+    taxCents: taxQuote.taxCents,
+    totalCents: taxQuote.totalCents,
     fulfillmentType,
     pickupDate,
     notes: emptyToNull(parsed.data.notes),
@@ -208,7 +235,7 @@ export async function createCheckoutSessionAction(
     },
   };
 
-  // Cash / check — place order without Stripe
+  // Cash / check — place order without Stripe card charge
   if (paymentMethod !== PaymentMethod.CARD) {
     const invoiceNumber = await nextInvoiceNumber();
 
@@ -236,7 +263,7 @@ export async function createCheckoutSessionAction(
     redirect(`/checkout/success?order_id=${order.id}`);
   }
 
-  // Card — Stripe Checkout
+  // Card — Stripe Checkout with automatic tax
   if (!process.env.STRIPE_SECRET_KEY) {
     return {
       error:
@@ -253,12 +280,44 @@ export async function createCheckoutSessionAction(
 
   const stripe = getStripe();
   const appUrl = getAppUrl();
+  const taxAddress = taxResolved.address;
 
   let checkoutSession;
   try {
+    const customer = await stripe.customers.create({
+      email: session.user.email,
+      name: parsed.data.name,
+      phone: phoneFormatted,
+      address: {
+        line1: taxAddress.line1,
+        line2: taxAddress.line2 || undefined,
+        city: taxAddress.city,
+        state: taxAddress.state,
+        postal_code: taxAddress.postalCode,
+        country: "US",
+      },
+      shipping: {
+        name: parsed.data.name,
+        address: {
+          line1: taxAddress.line1,
+          line2: taxAddress.line2 || undefined,
+          city: taxAddress.city,
+          state: taxAddress.state,
+          postal_code: taxAddress.postalCode,
+          country: "US",
+        },
+      },
+      metadata: { userId: session.user.id },
+    });
+
     checkoutSession = await stripe.checkout.sessions.create({
       mode: "payment",
-      customer_email: session.user.email,
+      customer: customer.id,
+      automatic_tax: { enabled: true },
+      customer_update: {
+        address: "auto",
+        shipping: "auto",
+      },
       line_items: cart.map((item) => ({
         quantity: item.quantity,
         price_data: {
@@ -267,6 +326,7 @@ export async function createCheckoutSessionAction(
           product_data: {
             name: item.name,
             description: item.weightLabel ?? undefined,
+            tax_code: productTaxCode(),
           },
         },
       })),
@@ -275,6 +335,7 @@ export async function createCheckoutSessionAction(
         userId: session.user.id,
         fulfillmentType: fulfillmentType,
         paymentMethod: "CARD",
+        taxCalculationId: taxQuote.calculationId ?? "",
       },
       success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/checkout/cancel?order_id=${order.id}`,
@@ -285,6 +346,13 @@ export async function createCheckoutSessionAction(
       data: { status: "CANCELLED" },
     });
     console.error("Stripe session error:", error);
+    const message = error instanceof Error ? error.message : "";
+    if (message.toLowerCase().includes("automatic tax")) {
+      return {
+        error:
+          "Enable Stripe Tax in your Stripe Dashboard (Tax → Get started + add tax registrations), then try again.",
+      };
+    }
     return { error: "Unable to start payment. Please try again." };
   }
 

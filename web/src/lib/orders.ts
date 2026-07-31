@@ -36,6 +36,8 @@ export async function fulfillCheckoutSession(
       ? session.payment_intent
       : session.payment_intent?.id ?? null;
 
+  const taxCents = session.total_details?.amount_tax ?? existing.taxCents;
+  const totalCents = session.amount_total ?? existing.totalCents;
   const invoiceNumber = await nextInvoiceNumber();
 
   await prisma.$transaction(async (tx) => {
@@ -45,7 +47,8 @@ export async function fulfillCheckoutSession(
         status: "PAID",
         stripeSessionId: session.id,
         stripePaymentIntentId: paymentIntentId,
-        totalCents: session.amount_total ?? existing.totalCents,
+        taxCents,
+        totalCents,
       },
     });
 

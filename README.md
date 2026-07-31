@@ -30,10 +30,22 @@ Open [http://localhost:3000](http://localhost:3000).
    - `NEXTAUTH_URL` → `https://flying-j-beef.onrender.com`
    - `STRIPE_SECRET_KEY` / `STRIPE_PUBLISHABLE_KEY` (Stripe test keys)
    - `STRIPE_WEBHOOK_SECRET` (from Stripe webhook endpoint)
+   - `BUSINESS_ADDRESS_LINE1`, `BUSINESS_CITY`, `BUSINESS_STATE`, `BUSINESS_ZIP` (pickup tax origin)
 4. After first deploy, seed products via Render shell:
    ```bash
    SEED_ADMIN_PASSWORD='your-secure-password' npm run db:seed
    ```
+
+### Stripe Tax (state & county)
+
+Sales tax uses **Stripe Tax** so rates follow the customer’s delivery address (or your business address for pickup).
+
+1. In Stripe Dashboard → **Tax** → Get started
+2. Set your **head office** address
+3. Add **tax registrations** for states where you have nexus (at least your home state)
+4. Card checkout uses `automatic_tax`; cash/check orders use the Tax Calculations API
+
+Product tax code defaults to `txcd_40060003` (fresh meat / poultry). Override with `STRIPE_PRODUCT_TAX_CODE` if needed.
 
 ### Stripe webhook
 

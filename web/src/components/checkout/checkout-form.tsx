@@ -5,6 +5,7 @@ import {
   createCheckoutSessionAction,
   type CheckoutState,
 } from "@/app/checkout/actions";
+import { TaxEstimatePanel } from "@/components/checkout/tax-estimate-panel";
 import { formatPhoneDisplay, formatPhoneInput } from "@/lib/phone";
 
 const initialState: CheckoutState = {};
@@ -17,10 +18,12 @@ export function CheckoutForm({
   defaultPhone,
   defaultAddress,
   defaultFulfillment,
+  subtotalCents,
 }: {
   defaultName?: string | null;
   defaultPhone?: string | null;
   defaultFulfillment?: "PICKUP" | "DELIVERY" | null;
+  subtotalCents: number;
   defaultAddress?: {
     addressLine1?: string | null;
     addressLine2?: string | null;
@@ -40,6 +43,15 @@ export function CheckoutForm({
   const [fulfillmentType, setFulfillmentType] = useState<"PICKUP" | "DELIVERY">(
     defaultFulfillment === "DELIVERY" ? "DELIVERY" : "PICKUP",
   );
+  const [addressLine1, setAddressLine1] = useState(
+    defaultAddress?.addressLine1 ?? "",
+  );
+  const [addressLine2, setAddressLine2] = useState(
+    defaultAddress?.addressLine2 ?? "",
+  );
+  const [city, setCity] = useState(defaultAddress?.city ?? "");
+  const [addrState, setAddrState] = useState(defaultAddress?.state ?? "");
+  const [zip, setZip] = useState(defaultAddress?.zip ?? "");
 
   const submitLabel =
     paymentMethod === "CARD"
@@ -145,7 +157,8 @@ export function CheckoutForm({
               type="text"
               required
               autoComplete="address-line1"
-              defaultValue={defaultAddress?.addressLine1 ?? ""}
+              value={addressLine1}
+              onChange={(e) => setAddressLine1(e.target.value)}
               className={inputClass}
             />
           </div>
@@ -160,7 +173,8 @@ export function CheckoutForm({
               name="addressLine2"
               type="text"
               autoComplete="address-line2"
-              defaultValue={defaultAddress?.addressLine2 ?? ""}
+              value={addressLine2}
+              onChange={(e) => setAddressLine2(e.target.value)}
               className={inputClass}
             />
           </div>
@@ -176,7 +190,8 @@ export function CheckoutForm({
                 type="text"
                 required
                 autoComplete="address-level2"
-                defaultValue={defaultAddress?.city ?? ""}
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
                 className={inputClass}
               />
             </div>
@@ -192,7 +207,8 @@ export function CheckoutForm({
                 maxLength={2}
                 autoComplete="address-level1"
                 placeholder="TX"
-                defaultValue={defaultAddress?.state ?? ""}
+                value={addrState}
+                onChange={(e) => setAddrState(e.target.value.toUpperCase())}
                 className={`${inputClass} uppercase`}
               />
             </div>
@@ -208,7 +224,8 @@ export function CheckoutForm({
                 autoComplete="postal-code"
                 inputMode="numeric"
                 placeholder="12345"
-                defaultValue={defaultAddress?.zip ?? ""}
+                value={zip}
+                onChange={(e) => setZip(e.target.value)}
                 className={inputClass}
               />
             </div>
@@ -291,6 +308,16 @@ export function CheckoutForm({
           className={`${inputClass} sm:max-w-xs`}
         />
       </div>
+
+      <TaxEstimatePanel
+        fulfillmentType={fulfillmentType}
+        addressLine1={addressLine1}
+        addressLine2={addressLine2}
+        city={city}
+        state={addrState}
+        zip={zip}
+        subtotalCents={subtotalCents}
+      />
 
       <div>
         <label htmlFor="notes" className="block text-sm font-medium text-charcoal">

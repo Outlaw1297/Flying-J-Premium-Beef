@@ -55,6 +55,7 @@ export default async function CheckoutPage() {
               defaultName={user?.name}
               defaultPhone={user?.phone}
               defaultFulfillment={user?.preferredFulfillment}
+              subtotalCents={subtotal}
               defaultAddress={{
                 addressLine1: user?.addressLine1,
                 addressLine2: user?.addressLine2,
@@ -93,7 +94,8 @@ export default async function CheckoutPage() {
               </span>
             </div>
             <p className="mt-2 text-xs text-charcoal/50">
-              Signed in as {user?.email}
+              Sales tax is calculated from delivery address (or pickup location) —
+              state and county rates via Stripe Tax.
             </p>
             <Link
               href="/cart"

@@ -171,6 +171,12 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
             </span>
           </div>
         )}
+        <div className="mt-2 flex justify-between text-sm">
+          <span className="text-charcoal/70">Sales tax</span>
+          <span className="font-medium text-charcoal">
+            {formatCents(order.taxCents)}
+          </span>
+        </div>
         <div className="mt-2 flex justify-between text-base">
           <span className="font-semibold text-charcoal">Total</span>
           <span className="font-semibold text-charcoal">
