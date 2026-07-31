@@ -7,6 +7,7 @@ import { requireAdmin, slugify } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
 import { OrderStatus } from "@/generated/prisma/enums";
 import { ensureProductSynced } from "@/lib/stripe-products";
+import { saveProductImage } from "@/lib/product-images";
 
 export type AdminFormState = { error?: string; success?: string };
 
@@ -42,15 +43,25 @@ export async function updateOrderStatusAction(
 
 const productSchema = z.object({
   name: z.string().min(1).max(120),
-  slug: z.string().max(80).optional(),
   description: z.string().max(2000).optional(),
   priceDollars: z.coerce.number().positive(),
   weightLabel: z.string().max(40).optional(),
   inventoryCount: z.coerce.number().int().min(0),
   category: z.string().max(60).optional(),
-  imageUrl: z.string().url().optional().or(z.literal("")),
   active: z.boolean().optional(),
 });
+
+async function uniqueSlugFromName(name: string, excludeId?: string) {
+  const base = slugify(name) || "product";
+  let candidate = base;
+  let n = 2;
+  while (true) {
+    const existing = await prisma.product.findUnique({ where: { slug: candidate } });
+    if (!existing || existing.id === excludeId) return candidate;
+    candidate = `${base}-${n}`;
+    n += 1;
+  }
+}
 
 export async function upsertProductAction(
   _prev: AdminFormState,
@@ -61,13 +72,11 @@ export async function upsertProductAction(
   const id = String(formData.get("id") || "");
   const parsed = productSchema.safeParse({
     name: formData.get("name"),
-    slug: formData.get("slug") || undefined,
     description: formData.get("description") || undefined,
     priceDollars: formData.get("priceDollars"),
     weightLabel: formData.get("weightLabel") || undefined,
     inventoryCount: formData.get("inventoryCount"),
     category: formData.get("category") || undefined,
-    imageUrl: formData.get("imageUrl") || "",
     active: formData.get("active") === "on",
   });
 
@@ -75,8 +84,25 @@ export async function upsertProductAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid product" };
   }
 
-  const slug = slugify(parsed.data.slug || parsed.data.name);
-  if (!slug) return { error: "Slug is required" };
+  const existing = id
+    ? await prisma.product.findUnique({ where: { id } })
+    : null;
+  if (id && !existing) {
+    return { error: "Product not found" };
+  }
+
+  // Keep URL stable when editing; generate from name on create
+  const slug = existing
+    ? existing.slug
+    : await uniqueSlugFromName(parsed.data.name);
+
+  let imageUrl = existing?.imageUrl ?? null;
+  const image = formData.get("image");
+  if (image instanceof File && image.size > 0) {
+    const saved = await saveProductImage(image);
+    if ("error" in saved) return { error: saved.error };
+    imageUrl = saved.imageUrl;
+  }
 
   const data = {
     name: parsed.data.name.trim(),
@@ -86,14 +112,9 @@ export async function upsertProductAction(
     weightLabel: parsed.data.weightLabel?.trim() || null,
     inventoryCount: parsed.data.inventoryCount,
     category: parsed.data.category?.trim() || null,
-    imageUrl: parsed.data.imageUrl?.trim() || null,
+    imageUrl,
     active: parsed.data.active ?? true,
   };
-
-  const conflict = await prisma.product.findUnique({ where: { slug } });
-  if (conflict && conflict.id !== id) {
-    return { error: "Another product already uses this slug" };
-  }
 
   let productId = id;
   if (id) {
@@ -111,6 +132,7 @@ export async function upsertProductAction(
 
   revalidatePath("/admin/products");
   revalidatePath("/shop");
+  revalidatePath(`/shop/${slug}`);
   redirect(`/admin/products/${productId}`);
 }
 

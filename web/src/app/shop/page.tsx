@@ -66,6 +66,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
               weightLabel={product.weightLabel}
               category={product.category}
               inventoryCount={product.inventoryCount}
+              imageUrl={product.imageUrl}
             />
           ))}
         </div>

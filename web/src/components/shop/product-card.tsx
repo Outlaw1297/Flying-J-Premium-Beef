@@ -11,6 +11,7 @@ type ProductCardProps = {
   weightLabel: string | null;
   category: string | null;
   inventoryCount: number;
+  imageUrl?: string | null;
 };
 
 const categoryGradients: Record<string, string> = {
@@ -28,6 +29,7 @@ export function ProductCard({
   weightLabel,
   category,
   inventoryCount,
+  imageUrl,
 }: ProductCardProps) {
   const gradient =
     categoryGradients[category ?? ""] ?? "from-charcoal/80 to-copper/70";
@@ -39,13 +41,25 @@ export function ProductCard({
       className="group flex flex-col overflow-hidden rounded-2xl border border-charcoal/10 bg-white shadow-sm transition-shadow hover:shadow-md"
     >
       <div
-        className={`relative flex h-40 items-end p-4 bg-gradient-to-br ${gradient}`}
+        className={`relative flex h-40 items-end overflow-hidden bg-gradient-to-br p-4 ${gradient}`}
       >
-        <span className="text-xs font-semibold uppercase tracking-wider text-cream/80">
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl}
+            alt={name}
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          />
+        ) : null}
+        <span
+          className={`relative z-10 text-xs font-semibold uppercase tracking-wider ${
+            imageUrl ? "rounded bg-charcoal/70 px-2 py-1 text-cream" : "text-cream/80"
+          }`}
+        >
           {categoryLabel(category)}
         </span>
         {outOfStock && (
-          <span className="absolute right-3 top-3 rounded-full bg-cream/90 px-2.5 py-1 text-xs font-semibold text-charcoal">
+          <span className="absolute right-3 top-3 z-10 rounded-full bg-cream/90 px-2.5 py-1 text-xs font-semibold text-charcoal">
             Out of stock
           </span>
         )}
