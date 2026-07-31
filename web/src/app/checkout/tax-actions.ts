@@ -2,6 +2,7 @@
 
 import { getCart, getCartSubtotal } from "@/lib/cart";
 import { resolveAppliedCoupon } from "@/lib/coupons";
+import { taxCodesForProductIds } from "@/lib/product-tax";
 import { calculateSalesTax, resolveTaxAddress } from "@/lib/tax";
 
 export type TaxEstimateState = {
@@ -45,11 +46,15 @@ export async function estimateTaxAction(
   }
 
   try {
+    const taxCodesByProductId = await taxCodesForProductIds(
+      cart.map((item) => item.productId),
+    );
     const quote = await calculateSalesTax({
       cart,
       address: resolved.address,
       addressSource: resolved.source,
       discountCents: applied?.discountCents ?? 0,
+      taxCodesByProductId,
     });
 
     return {

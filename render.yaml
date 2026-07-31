@@ -38,7 +38,7 @@ services:
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
       - key: STRIPE_PRODUCT_TAX_CODE
-        value: txcd_40060003
+        value: txcd_40040013
       - key: BUSINESS_ADDRESS_LINE1
         value: "10457 Lanesboro Rd"
       - key: BUSINESS_ADDRESS_LINE2
