@@ -40,7 +40,7 @@ export default async function CartPage() {
           </div>
 
           <p className="mt-2 text-xs text-charcoal/50">
-            Secure payment via Stripe. You&apos;ll confirm pickup or delivery next.
+            Guest checkout welcome — no account required. Card payments via Stripe.
           </p>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">

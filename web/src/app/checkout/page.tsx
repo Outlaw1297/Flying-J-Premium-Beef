@@ -13,30 +13,30 @@ export const metadata: Metadata = {
 
 export default async function CheckoutPage() {
   const session = await auth();
-  if (!session?.user?.id) {
-    redirect("/login?callbackUrl=/checkout");
-  }
-
   const cart = await getCart();
   if (cart.length === 0) {
     redirect("/cart");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      name: true,
-      phone: true,
-      email: true,
-      addressLine1: true,
-      addressLine2: true,
-      city: true,
-      state: true,
-      zip: true,
-      preferredFulfillment: true,
-    },
-  });
+  const user = session?.user?.id
+    ? await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          name: true,
+          phone: true,
+          email: true,
+          passwordHash: true,
+          addressLine1: true,
+          addressLine2: true,
+          city: true,
+          state: true,
+          zip: true,
+          preferredFulfillment: true,
+        },
+      })
+    : null;
 
+  const isSignedIn = Boolean(session?.user?.id && user?.passwordHash);
   const subtotal = getCartSubtotal(cart);
 
   return (
@@ -45,16 +45,33 @@ export default async function CheckoutPage() {
         Checkout
       </h1>
       <p className="mt-2 text-charcoal/70">
-        Confirm your details, address for delivery, then choose how to pay.
+        {isSignedIn
+          ? "Confirm your details, address for delivery, then choose how to pay."
+          : "Order as a guest — no account required. We’ll email order updates to the address you provide."}
       </p>
+      {!isSignedIn && (
+        <p className="mt-2 text-sm text-charcoal/60">
+          Already have an account?{" "}
+          <Link
+            href="/login?callbackUrl=/checkout"
+            className="font-medium text-copper hover:underline"
+          >
+            Sign in
+          </Link>{" "}
+          for faster checkout and order history.
+        </p>
+      )}
 
       <div className="mt-10 grid gap-10 lg:grid-cols-5">
         <div className="lg:col-span-3">
           <div className="rounded-2xl border border-charcoal/10 bg-white p-6 shadow-sm">
             <CheckoutForm
               defaultName={user?.name}
+              defaultEmail={user?.email ?? session?.user?.email}
               defaultPhone={user?.phone}
               defaultFulfillment={user?.preferredFulfillment}
+              emailLocked={isSignedIn}
+              isGuestCheckout={!isSignedIn}
               subtotalCents={subtotal}
               defaultAddress={{
                 addressLine1: user?.addressLine1,

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getCart, getCartSubtotal, setCart, type CartItem } from "@/lib/cart";
+import { resolveCheckoutUser } from "@/lib/checkout-user";
 import { getAppUrl, getStripe } from "@/lib/stripe";
 import { nextInvoiceNumber } from "@/lib/invoices";
 import { formatPhoneDisplay, normalizeUsPhone } from "@/lib/phone";
@@ -15,6 +16,7 @@ import { FulfillmentType, PaymentMethod } from "@/generated/prisma/enums";
 const checkoutSchema = z
   .object({
     name: z.string().min(1, "Name is required").max(100),
+    email: z.string().email("Valid email is required").max(120),
     phone: z.string().min(7, "Phone is required").max(30),
     fulfillmentType: z.enum(["PICKUP", "DELIVERY"]),
     paymentMethod: z.enum(["CARD", "CASH", "CHECK"]),
@@ -60,7 +62,10 @@ const checkoutSchema = z
     }
   });
 
-export type CheckoutState = { error?: string };
+export type CheckoutState = {
+  error?: string;
+  needsLogin?: boolean;
+};
 
 function emptyToNull(value?: string) {
   const trimmed = value?.trim();
@@ -105,12 +110,10 @@ export async function createCheckoutSessionAction(
   formData: FormData,
 ): Promise<CheckoutState> {
   const session = await auth();
-  if (!session?.user?.id) {
-    redirect("/login?callbackUrl=/checkout");
-  }
 
   const parsed = checkoutSchema.safeParse({
     name: formData.get("name"),
+    email: formData.get("email"),
     phone: formData.get("phone"),
     fulfillmentType: formData.get("fulfillmentType"),
     paymentMethod: formData.get("paymentMethod"),
@@ -196,26 +199,30 @@ export async function createCheckoutSessionAction(
     return { error: "Unable to calculate sales tax. Please try again." };
   }
 
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: {
+  const checkoutUser = await resolveCheckoutUser({
+    sessionUserId: session?.user?.id,
+    customer: {
+      email: parsed.data.email,
       name: parsed.data.name,
       phone: phoneFormatted,
       preferredFulfillment: fulfillmentType,
-      ...(fulfillmentType === FulfillmentType.DELIVERY
-        ? {
-            addressLine1: addressFields.addressLine1,
-            addressLine2: addressFields.addressLine2,
-            city: addressFields.city,
-            state: addressFields.state,
-            zip: addressFields.zip,
-          }
-        : {}),
+      addressLine1: addressFields.addressLine1,
+      addressLine2: addressFields.addressLine2,
+      city: addressFields.city,
+      state: addressFields.state,
+      zip: addressFields.zip,
     },
   });
 
+  if ("error" in checkoutUser) {
+    return {
+      error: checkoutUser.error,
+      needsLogin: checkoutUser.needsLogin,
+    };
+  }
+
   const orderBase = {
-    userId: session.user.id,
+    userId: checkoutUser.userId,
     status: "PENDING" as const,
     paymentMethod,
     subtotalCents,
@@ -261,7 +268,11 @@ export async function createCheckoutSessionAction(
     });
 
     await setCart([]);
-    redirect(`/checkout/success?order_id=${order.id}`);
+    redirect(
+      `/checkout/success?order_id=${order.id}${
+        checkoutUser.isGuest ? "&guest=1" : ""
+      }`,
+    );
   }
 
   // Card — Stripe Checkout with automatic tax
@@ -286,7 +297,7 @@ export async function createCheckoutSessionAction(
   let checkoutSession;
   try {
     const customer = await stripe.customers.create({
-      email: session.user.email,
+      email: checkoutUser.email,
       name: parsed.data.name,
       phone: phoneFormatted,
       address: {
@@ -308,7 +319,7 @@ export async function createCheckoutSessionAction(
           country: "US",
         },
       },
-      metadata: { userId: session.user.id },
+      metadata: { userId: checkoutUser.userId },
     });
 
     const lineItems = [];
@@ -333,6 +344,7 @@ export async function createCheckoutSessionAction(
       }
     }
 
+    const successGuest = checkoutUser.isGuest ? "&guest=1" : "";
     checkoutSession = await stripe.checkout.sessions.create({
       mode: "payment",
       customer: customer.id,
@@ -344,12 +356,12 @@ export async function createCheckoutSessionAction(
       line_items: lineItems,
       metadata: {
         orderId: order.id,
-        userId: session.user.id,
+        userId: checkoutUser.userId,
         fulfillmentType: fulfillmentType,
         paymentMethod: "CARD",
         taxCalculationId: taxQuote.calculationId ?? "",
       },
-      success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}${successGuest}`,
       cancel_url: `${appUrl}/checkout/cancel?order_id=${order.id}`,
     });
   } catch (error) {

@@ -12,13 +12,21 @@ export const metadata: Metadata = {
 };
 
 type SuccessPageProps = {
-  searchParams: Promise<{ session_id?: string; order_id?: string }>;
+  searchParams: Promise<{
+    session_id?: string;
+    order_id?: string;
+    guest?: string;
+  }>;
 };
 
 export default async function CheckoutSuccessPage({
   searchParams,
 }: SuccessPageProps) {
-  const { session_id: sessionId, order_id: orderIdParam } = await searchParams;
+  const {
+    session_id: sessionId,
+    order_id: orderIdParam,
+    guest: guestParam,
+  } = await searchParams;
   const session = await auth();
 
   let invoiceNumber: string | null = null;
@@ -26,6 +34,9 @@ export default async function CheckoutSuccessPage({
   let orderId: string | null = null;
   let paymentMethod: string | null = null;
   let paidOnline = false;
+  let guestEmail: string | null = null;
+  let guestName: string | null = null;
+  let isGuestOrder = guestParam === "1";
 
   if (sessionId && process.env.STRIPE_SECRET_KEY) {
     try {
@@ -38,7 +49,10 @@ export default async function CheckoutSuccessPage({
 
       const order = await prisma.order.findFirst({
         where: { stripeSessionId: sessionId },
-        include: { invoice: true },
+        include: {
+          invoice: true,
+          user: { select: { email: true, name: true, passwordHash: true } },
+        },
       });
 
       if (order) {
@@ -47,27 +61,55 @@ export default async function CheckoutSuccessPage({
         invoiceNumber = order.invoice?.invoiceNumber ?? null;
         paymentMethod = order.paymentMethod;
         paidOnline = order.status === "PAID";
+        if (!order.user.passwordHash) {
+          isGuestOrder = true;
+          guestEmail = order.user.email;
+          guestName = order.user.name;
+        }
       }
     } catch (error) {
       console.error("Success page session lookup failed:", error);
     }
-  } else if (orderIdParam && session?.user?.id) {
+  } else if (orderIdParam) {
     const order = await prisma.order.findFirst({
-      where: { id: orderIdParam, userId: session.user.id },
-      include: { invoice: true },
+      where: { id: orderIdParam },
+      include: {
+        invoice: true,
+        user: { select: { email: true, name: true, passwordHash: true } },
+      },
     });
 
-    if (order) {
+    const canView =
+      order &&
+      (order.userId === session?.user?.id || !order.user.passwordHash);
+
+    if (order && canView) {
       orderId = order.id;
       totalCents = order.totalCents;
       invoiceNumber = order.invoice?.invoiceNumber ?? null;
       paymentMethod = order.paymentMethod;
       paidOnline = order.status === "PAID";
+      if (!order.user.passwordHash) {
+        isGuestOrder = true;
+        guestEmail = order.user.email;
+        guestName = order.user.name;
+      }
     }
   }
 
   const isOfflinePay =
     paymentMethod === "CASH" || paymentMethod === "CHECK";
+
+  const showAccountCta =
+    isGuestOrder &&
+    guestEmail &&
+    !(session?.user?.id && session.user.email === guestEmail);
+
+  const registerHref = guestEmail
+    ? `/register?email=${encodeURIComponent(guestEmail)}${
+        guestName ? `&name=${encodeURIComponent(guestName)}` : ""
+      }&from=checkout`
+    : "/register?from=checkout";
 
   return (
     <div className="mx-auto max-w-lg px-4 py-16 sm:px-6 sm:py-20 text-center">
@@ -115,13 +157,49 @@ export default async function CheckoutSuccessPage({
         </div>
       )}
 
+      {showAccountCta && (
+        <div className="mt-8 rounded-2xl border border-copper/30 bg-copper/5 p-6 text-left">
+          <h2 className="font-display text-lg font-semibold text-charcoal">
+            Save your order with a free account
+          </h2>
+          <p className="mt-2 text-sm text-charcoal/70 leading-relaxed">
+            Create a password for{" "}
+            <span className="font-medium text-charcoal">{guestEmail}</span> to
+            track this order, get newsletters and coupons, and reorder your
+            favorites faster next time.
+          </p>
+          <Link
+            href={registerHref}
+            className="mt-4 inline-flex w-full justify-center rounded-full bg-copper px-6 py-3 text-sm font-semibold text-cream hover:bg-copper/90 transition-colors sm:w-auto"
+          >
+            Create account
+          </Link>
+        </div>
+      )}
+
       <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-        <Link
-          href={orderId ? "/account/orders" : "/account"}
-          className="inline-flex justify-center rounded-full bg-charcoal px-6 py-3 text-sm font-semibold text-cream hover:bg-charcoal/90 transition-colors"
-        >
-          View orders
-        </Link>
+        {session?.user?.id && !isGuestOrder ? (
+          <Link
+            href={orderId ? `/account/orders/${orderId}` : "/account/orders"}
+            className="inline-flex justify-center rounded-full bg-charcoal px-6 py-3 text-sm font-semibold text-cream hover:bg-charcoal/90 transition-colors"
+          >
+            View order
+          </Link>
+        ) : showAccountCta ? (
+          <Link
+            href={registerHref}
+            className="inline-flex justify-center rounded-full bg-charcoal px-6 py-3 text-sm font-semibold text-cream hover:bg-charcoal/90 transition-colors"
+          >
+            Create account
+          </Link>
+        ) : (
+          <Link
+            href="/account"
+            className="inline-flex justify-center rounded-full bg-charcoal px-6 py-3 text-sm font-semibold text-cream hover:bg-charcoal/90 transition-colors"
+          >
+            Your account
+          </Link>
+        )}
         <Link
           href="/shop"
           className="inline-flex justify-center rounded-full border border-charcoal/15 px-6 py-3 text-sm font-medium text-charcoal hover:border-charcoal/30 transition-colors"

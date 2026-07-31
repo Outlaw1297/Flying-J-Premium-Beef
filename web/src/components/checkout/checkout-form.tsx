@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import {
   createCheckoutSessionAction,
   type CheckoutState,
@@ -15,14 +16,20 @@ const inputClass =
 
 export function CheckoutForm({
   defaultName,
+  defaultEmail,
   defaultPhone,
   defaultAddress,
   defaultFulfillment,
+  emailLocked = false,
+  isGuestCheckout = false,
   subtotalCents,
 }: {
   defaultName?: string | null;
+  defaultEmail?: string | null;
   defaultPhone?: string | null;
   defaultFulfillment?: "PICKUP" | "DELIVERY" | null;
+  emailLocked?: boolean;
+  isGuestCheckout?: boolean;
   subtotalCents: number;
   defaultAddress?: {
     addressLine1?: string | null;
@@ -67,10 +74,48 @@ export function CheckoutForm({
       {state.error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {state.error}
+          {state.needsLogin && (
+            <p className="mt-2">
+              <Link
+                href="/login?callbackUrl=/checkout"
+                className="font-medium underline hover:no-underline"
+              >
+                Sign in to continue
+              </Link>
+            </p>
+          )}
+        </div>
+      )}
+
+      {isGuestCheckout && (
+        <div className="rounded-xl border border-copper/25 bg-copper/5 px-4 py-3 text-sm text-charcoal/80">
+          <p className="font-medium text-charcoal">Ordering as a guest</p>
+          <p className="mt-1 text-charcoal/70">
+            After checkout you can create a free account to save order history,
+            get newsletter deals and coupons, and reorder faster next time.
+          </p>
         </div>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <label htmlFor="email" className="block text-sm font-medium text-charcoal">
+            Email
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            readOnly={emailLocked}
+            defaultValue={defaultEmail ?? ""}
+            className={`${inputClass}${emailLocked ? " bg-cream/60 text-charcoal/80" : ""}`}
+          />
+          <p className="mt-1 text-xs text-charcoal/50">
+            Order confirmation and updates go here.
+          </p>
+        </div>
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-charcoal">
             Full name
@@ -80,6 +125,7 @@ export function CheckoutForm({
             name="name"
             type="text"
             required
+            autoComplete="name"
             defaultValue={defaultName ?? ""}
             className={inputClass}
           />

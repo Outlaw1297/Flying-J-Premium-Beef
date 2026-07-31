@@ -11,9 +11,7 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isProtected =
-    pathname.startsWith("/account") ||
-    pathname.startsWith("/admin") ||
-    pathname.startsWith("/checkout");
+    pathname.startsWith("/account") || pathname.startsWith("/admin");
   const isAdminRoute = pathname.startsWith("/admin");
 
   if (!token && isProtected) {
@@ -30,5 +28,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/account/:path*", "/admin/:path*", "/checkout", "/checkout/:path*"],
+  matcher: ["/account/:path*", "/admin/:path*"],
 };
