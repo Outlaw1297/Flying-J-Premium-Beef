@@ -64,6 +64,14 @@ export function LoginForm() {
           minLength={8}
           className="mt-1.5 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2.5 text-charcoal shadow-sm focus:border-copper focus:outline-none focus:ring-2 focus:ring-copper/20"
         />
+        <p className="mt-1.5 text-right text-xs">
+          <Link
+            href="/forgot-password"
+            className="font-medium text-copper hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </p>
       </div>
 
       <button

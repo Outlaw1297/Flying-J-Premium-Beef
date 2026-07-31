@@ -85,6 +85,8 @@ model User {
   email                String            @unique
   passwordHash         String?           @map("password_hash")
   claimToken           String?           @map("claim_token")
+  passwordResetToken   String?           @unique @map("password_reset_token")
+  passwordResetExpires DateTime?         @map("password_reset_expires")
   name                 String?
   phone                String?
   role                 UserRole          @default(CUSTOMER)
