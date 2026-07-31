@@ -16,7 +16,9 @@ import { subscribeToNewsletter } from "@/lib/newsletter";
 import { getAppUrl, getStripe } from "@/lib/stripe";
 import { nextInvoiceNumber } from "@/lib/invoices";
 import { formatPhoneDisplay, normalizeUsPhone } from "@/lib/phone";
-import { calculateSalesTax, productTaxCode, resolveTaxAddress } from "@/lib/tax";
+import { taxCodesForProductIds } from "@/lib/product-tax";
+import { resolveProductTaxCode } from "@/lib/stripe-tax-codes";
+import { calculateSalesTax, resolveTaxAddress } from "@/lib/tax";
 import { ensureProductSynced } from "@/lib/stripe-products";
 import { prisma } from "@/lib/prisma";
 import { FulfillmentType, PaymentMethod } from "@/generated/prisma/enums";
@@ -199,6 +201,10 @@ export async function createCheckoutSessionAction(
     return { error: taxResolved.error };
   }
 
+  const taxCodesByProductId = await taxCodesForProductIds(
+    cart.map((item) => item.productId),
+  );
+
   let taxQuote;
   try {
     taxQuote = await calculateSalesTax({
@@ -206,6 +212,7 @@ export async function createCheckoutSessionAction(
       address: taxResolved.address,
       addressSource: taxResolved.source,
       discountCents,
+      taxCodesByProductId,
     });
   } catch {
     return { error: "Unable to calculate sales tax. Please try again." };
@@ -388,7 +395,9 @@ export async function createCheckoutSessionAction(
             product_data: {
               name: item.name,
               description: item.weightLabel ?? undefined,
-              tax_code: productTaxCode(),
+              tax_code: resolveProductTaxCode(
+                taxCodesByProductId[item.productId],
+              ),
             },
           },
         });

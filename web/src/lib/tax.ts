@@ -1,5 +1,9 @@
 import { getStripe } from "@/lib/stripe";
 import type { CartItem } from "@/lib/cart";
+import {
+  DEFAULT_PRODUCT_TAX_CODE,
+  resolveProductTaxCode,
+} from "@/lib/stripe-tax-codes";
 
 export type TaxAddress = {
   line1: string;
@@ -19,9 +23,11 @@ export type TaxQuote = {
   jurisdiction?: string | null;
 };
 
-/** Stripe tax code for fresh meat / poultry (grocery-style food rules). */
+/** @deprecated Prefer per-product stripeTaxCode; kept for env override fallback. */
 export function productTaxCode(): string {
-  return process.env.STRIPE_PRODUCT_TAX_CODE ?? "txcd_40060003";
+  return (
+    process.env.STRIPE_PRODUCT_TAX_CODE?.trim() || DEFAULT_PRODUCT_TAX_CODE
+  );
 }
 
 /** Business / pickup location — used for origin-style pickup tax. */
@@ -86,6 +92,8 @@ export async function calculateSalesTax(input: {
   addressSource: "shipping" | "billing";
   /** Applied after subtotal, before tax (e.g. coupon). */
   discountCents?: number;
+  /** Per-product Stripe tax codes; falls back to meat default. */
+  taxCodesByProductId?: Record<string, string | null | undefined>;
 }): Promise<TaxQuote & { warning?: string }> {
   const rawSubtotal = input.cart.reduce(
     (sum, item) => sum + item.priceCents * item.quantity,
@@ -120,7 +128,9 @@ export async function calculateSalesTax(input: {
         amount: Math.max(0, Math.round(full * scale)),
         quantity: item.quantity,
         reference: item.productId || `item-${index}`,
-        tax_code: productTaxCode(),
+        tax_code: resolveProductTaxCode(
+          input.taxCodesByProductId?.[item.productId],
+        ),
       };
     });
 

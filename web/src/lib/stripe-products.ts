@@ -1,5 +1,5 @@
 import { getStripe } from "@/lib/stripe";
-import { productTaxCode } from "@/lib/tax";
+import { resolveProductTaxCode } from "@/lib/stripe-tax-codes";
 import { prisma } from "@/lib/prisma";
 import type { Product } from "@/generated/prisma/client";
 
@@ -14,6 +14,7 @@ type SyncableProduct = Pick<
   | "imageUrl"
   | "active"
   | "category"
+  | "stripeTaxCode"
   | "stripeProductId"
   | "stripePriceId"
 >;
@@ -30,7 +31,7 @@ export async function syncProductToStripe(
   }
 
   const stripe = getStripe();
-  const taxCode = productTaxCode();
+  const taxCode = resolveProductTaxCode(product.stripeTaxCode);
 
   let stripeProductId = product.stripeProductId;
 

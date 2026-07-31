@@ -7,6 +7,10 @@ import { requireAdmin, slugify } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
 import { OrderStatus } from "@/generated/prisma/enums";
 import { ensureProductSynced } from "@/lib/stripe-products";
+import {
+  DEFAULT_PRODUCT_TAX_CODE,
+  isKnownTaxCode,
+} from "@/lib/stripe-tax-codes";
 
 export type AdminFormState = { error?: string; success?: string };
 
@@ -49,6 +53,7 @@ const productSchema = z.object({
   inventoryCount: z.coerce.number().int().min(0),
   category: z.string().max(60).optional(),
   imageUrl: z.string().url().optional().or(z.literal("")),
+  stripeTaxCode: z.string().min(1).max(40),
   active: z.boolean().optional(),
 });
 
@@ -68,11 +73,16 @@ export async function upsertProductAction(
     inventoryCount: formData.get("inventoryCount"),
     category: formData.get("category") || undefined,
     imageUrl: formData.get("imageUrl") || "",
+    stripeTaxCode: formData.get("stripeTaxCode") || DEFAULT_PRODUCT_TAX_CODE,
     active: formData.get("active") === "on",
   });
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid product" };
+  }
+
+  if (!isKnownTaxCode(parsed.data.stripeTaxCode)) {
+    return { error: "Choose a valid Stripe tax code" };
   }
 
   const slug = slugify(parsed.data.slug || parsed.data.name);
@@ -87,6 +97,7 @@ export async function upsertProductAction(
     inventoryCount: parsed.data.inventoryCount,
     category: parsed.data.category?.trim() || null,
     imageUrl: parsed.data.imageUrl?.trim() || null,
+    stripeTaxCode: parsed.data.stripeTaxCode,
     active: parsed.data.active ?? true,
   };
 

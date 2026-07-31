@@ -105,6 +105,8 @@ model Product {
   imageUrl        String?  @map("image_url")
   active          Boolean  @default(true)
   category        String?
+  /** Stripe Product Tax Code (PTC), e.g. txcd_40040013 Meat and Meat Products */
+  stripeTaxCode   String   @default("txcd_40040013") @map("stripe_tax_code")
   stripeProductId String?  @unique @map("stripe_product_id")
   stripePriceId   String?  @unique @map("stripe_price_id")
   createdAt       DateTime @default(now()) @map("created_at")

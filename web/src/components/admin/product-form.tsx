@@ -1,10 +1,14 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import {
   upsertProductAction,
   type AdminFormState,
 } from "@/app/admin/actions";
+import {
+  DEFAULT_PRODUCT_TAX_CODE,
+  STRIPE_TAX_CODES,
+} from "@/lib/stripe-tax-codes";
 
 const initialState: AdminFormState = {};
 
@@ -24,6 +28,7 @@ export function ProductForm({
     inventoryCount: number;
     category: string | null;
     imageUrl: string | null;
+    stripeTaxCode?: string | null;
     active: boolean;
   } | null;
 }) {
@@ -31,6 +36,30 @@ export function ProductForm({
     upsertProductAction,
     initialState,
   );
+  const [taxFilter, setTaxFilter] = useState("");
+  const selectedTax =
+    product?.stripeTaxCode?.trim() || DEFAULT_PRODUCT_TAX_CODE;
+
+  const taxOptions = useMemo(() => {
+    const q = taxFilter.trim().toLowerCase();
+    const filtered = !q
+      ? STRIPE_TAX_CODES
+      : STRIPE_TAX_CODES.filter(
+          (c) =>
+            c.id.toLowerCase().includes(q) ||
+            c.name.toLowerCase().includes(q) ||
+            c.description.toLowerCase().includes(q),
+        );
+    // Keep the current selection visible even when the filter would hide it
+    if (!filtered.some((c) => c.id === selectedTax)) {
+      const current = STRIPE_TAX_CODES.find((c) => c.id === selectedTax);
+      if (current) return [current, ...filtered];
+    }
+    return filtered;
+  }, [taxFilter, selectedTax]);
+
+  const physical = taxOptions.filter((c) => c.type === "Physical goods");
+  const services = taxOptions.filter((c) => c.type !== "Physical goods");
 
   return (
     <form action={formAction} className="space-y-5">
@@ -133,6 +162,53 @@ export function ProductForm({
             className={inputClass}
           />
         </div>
+
+        <div className="sm:col-span-2">
+          <label htmlFor="stripeTaxCode" className="block text-sm font-medium text-charcoal">
+            Stripe tax code
+          </label>
+          <input
+            type="search"
+            value={taxFilter}
+            onChange={(e) => setTaxFilter(e.target.value)}
+            placeholder="Filter tax codes (e.g. meat, grocery, food…)"
+            className={inputClass}
+            aria-label="Filter Stripe tax codes"
+          />
+          <select
+            id="stripeTaxCode"
+            name="stripeTaxCode"
+            required
+            defaultValue={selectedTax}
+            className={`${inputClass} mt-2`}
+            size={8}
+          >
+            {physical.length > 0 && (
+              <optgroup label="Physical goods">
+                {physical.map((code) => (
+                  <option key={code.id} value={code.id} title={code.description}>
+                    {code.name} — {code.id}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {services.length > 0 && (
+              <optgroup label="Services & other">
+                {services.map((code) => (
+                  <option key={code.id} value={code.id} title={code.description}>
+                    {code.name} — {code.id}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+          <p className="mt-1 text-xs text-charcoal/50">
+            Default for beef is{" "}
+            <span className="font-medium">Meat and Meat Products</span> (
+            {DEFAULT_PRODUCT_TAX_CODE}). Synced to Stripe on save.
+          </p>
+        </div>
+
         <div className="sm:col-span-2">
           <label htmlFor="description" className="block text-sm font-medium text-charcoal">
             Description
