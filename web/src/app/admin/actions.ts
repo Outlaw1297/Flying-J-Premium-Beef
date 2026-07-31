@@ -49,6 +49,12 @@ const productSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().max(2000).optional(),
   priceDollars: z.coerce.number().positive(),
+  pricingMode: z.enum(["FIXED", "PER_POUND_HANGING"]),
+  estimatedLbs: z.preprocess((value) => {
+    if (value === "" || value === undefined || value === null) return undefined;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  }, z.number().positive().optional()),
   weightLabel: z.string().max(40).optional(),
   inventoryCount: z.coerce.number().int().min(0),
   category: z.string().max(60).optional(),
@@ -79,6 +85,8 @@ export async function upsertProductAction(
     name: formData.get("name"),
     description: formData.get("description") || undefined,
     priceDollars: formData.get("priceDollars"),
+    pricingMode: formData.get("pricingMode") || "FIXED",
+    estimatedLbs: formData.get("estimatedLbs") || undefined,
     weightLabel: formData.get("weightLabel") || undefined,
     inventoryCount: formData.get("inventoryCount"),
     category: formData.get("category") || undefined,
@@ -93,6 +101,12 @@ export async function upsertProductAction(
   if (!isKnownTaxCode(parsed.data.stripeTaxCode)) {
     return { error: "Choose a valid Stripe tax code" };
   }
+
+  const estimatedLbs =
+    parsed.data.pricingMode === "PER_POUND_HANGING" &&
+    typeof parsed.data.estimatedLbs === "number"
+      ? parsed.data.estimatedLbs
+      : null;
 
   const existing = id
     ? await prisma.product.findUnique({ where: { id } })
@@ -119,6 +133,8 @@ export async function upsertProductAction(
     slug,
     description: parsed.data.description?.trim() || null,
     priceCents: Math.round(parsed.data.priceDollars * 100),
+    pricingMode: parsed.data.pricingMode,
+    estimatedLbs,
     weightLabel: parsed.data.weightLabel?.trim() || null,
     inventoryCount: parsed.data.inventoryCount,
     category: parsed.data.category?.trim() || null,

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import { getCart, getCartSubtotal, setCart, type CartItem } from "@/lib/cart";
+import { getCart, getCartSubtotal, setCart, cartHasHangingWeight, type CartItem } from "@/lib/cart";
 import { resolveCheckoutUser } from "@/lib/checkout-user";
 import {
   recordCouponRedemption,
@@ -14,7 +14,12 @@ import {
 import { createOrderConfirmToken } from "@/lib/guest-tokens";
 import { subscribeToNewsletter } from "@/lib/newsletter";
 import { getAppUrl, getStripe } from "@/lib/stripe";
-import { nextInvoiceNumber } from "@/lib/invoices";
+import {
+  buildInvoiceLinesFromCart,
+  nextInvoiceNumber,
+  recalculateInvoiceTotals,
+} from "@/lib/invoices";
+import { sendOrderReceivedEmail } from "@/lib/email";
 import { formatPhoneDisplay, normalizeUsPhone } from "@/lib/phone";
 import { taxCodesForProductIds } from "@/lib/product-tax";
 import { resolveProductTaxCode } from "@/lib/stripe-tax-codes";
@@ -29,7 +34,7 @@ const checkoutSchema = z
     email: z.string().email("Valid email is required").max(120),
     phone: z.string().min(7, "Phone is required").max(30),
     fulfillmentType: z.enum(["PICKUP", "DELIVERY"]),
-    paymentMethod: z.enum(["CARD", "CASH", "CHECK"]),
+    paymentMethod: z.enum(["CARD", "CASH", "CHECK", "INVOICE"]),
     pickupDate: z.string().optional(),
     notes: z.string().max(500).optional(),
     addressLine1: z.string().max(120).optional(),
@@ -152,8 +157,23 @@ export async function createCheckoutSessionAction(
   if ("error" in validated && validated.error) {
     return { error: validated.error };
   }
+  const productMap = validated.productMap!;
 
-  const subtotalCents = getCartSubtotal(cart);
+  // Refresh hanging-weight metadata from DB onto cart lines
+  const enrichedCart: CartItem[] = cart.map((item) => {
+    const product = productMap.get(item.productId)!;
+    return {
+      ...item,
+      pricingMode: product.pricingMode,
+      estimatedLbs: product.estimatedLbs,
+      priceCents: product.priceCents,
+    };
+  });
+  const hasHangingWeight =
+    cartHasHangingWeight(enrichedCart) ||
+    [...productMap.values()].some((p) => p.pricingMode === "PER_POUND_HANGING");
+
+  const subtotalCents = getCartSubtotal(enrichedCart);
   const appliedCoupon = await resolveAppliedCoupon(subtotalCents);
   const discountCents = appliedCoupon?.discountCents ?? 0;
 
@@ -162,12 +182,20 @@ export async function createCheckoutSessionAction(
       ? FulfillmentType.DELIVERY
       : FulfillmentType.PICKUP;
 
-  const paymentMethod =
+  let paymentMethod =
     parsed.data.paymentMethod === "CASH"
       ? PaymentMethod.CASH
       : parsed.data.paymentMethod === "CHECK"
         ? PaymentMethod.CHECK
-        : PaymentMethod.CARD;
+        : parsed.data.paymentMethod === "INVOICE"
+          ? PaymentMethod.INVOICE
+          : PaymentMethod.CARD;
+
+  if (hasHangingWeight) {
+    paymentMethod = PaymentMethod.INVOICE;
+  } else if (paymentMethod === PaymentMethod.INVOICE) {
+    return { error: "Invoice checkout is only for hanging-weight orders" };
+  }
 
   let pickupDate: Date | null = null;
   if (parsed.data.pickupDate) {
@@ -202,20 +230,29 @@ export async function createCheckoutSessionAction(
   }
 
   const taxCodesByProductId = await taxCodesForProductIds(
-    cart.map((item) => item.productId),
+    enrichedCart.map((item) => item.productId),
   );
 
-  let taxQuote;
-  try {
-    taxQuote = await calculateSalesTax({
-      cart,
-      address: taxResolved.address,
-      addressSource: taxResolved.source,
-      discountCents,
-      taxCodesByProductId,
-    });
-  } catch {
-    return { error: "Unable to calculate sales tax. Please try again." };
+  let taxQuote = {
+    taxCents: 0,
+    totalCents: Math.max(0, subtotalCents - discountCents),
+    subtotalCents,
+    calculationId: null as string | null,
+  };
+
+  // Skip Stripe Tax until hanging weight is finalized — amount is unknown
+  if (!hasHangingWeight) {
+    try {
+      taxQuote = await calculateSalesTax({
+        cart: enrichedCart,
+        address: taxResolved.address,
+        addressSource: taxResolved.source,
+        discountCents,
+        taxCodesByProductId,
+      });
+    } catch {
+      return { error: "Unable to calculate sales tax. Please try again." };
+    }
   }
 
   const checkoutUser = await resolveCheckoutUser({
@@ -256,7 +293,7 @@ export async function createCheckoutSessionAction(
     notes: emptyToNull(parsed.data.notes),
     ...addressFields,
     items: {
-      create: cart.map((item) => ({
+      create: enrichedCart.map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
         priceCents: item.priceCents,
@@ -265,9 +302,130 @@ export async function createCheckoutSessionAction(
     },
   };
 
+  // Hanging-weight / deferred invoice — submit now, pay after weigh-in
+  if (paymentMethod === PaymentMethod.INVOICE) {
+    const invoiceNumber = await nextInvoiceNumber();
+    const lines = buildInvoiceLinesFromCart(
+      enrichedCart.map((item) => ({
+        productId: item.productId,
+        name: item.name,
+        quantity: item.quantity,
+        priceCents: item.priceCents,
+        pricingMode: item.pricingMode ?? "FIXED",
+        estimatedLbs: item.estimatedLbs ?? null,
+        weightLabel: item.weightLabel ?? null,
+      })),
+    );
+    const totals = recalculateInvoiceTotals({
+      lines,
+      discountCents,
+      taxCents: 0,
+    });
+
+    let order;
+    try {
+      order = await prisma.$transaction(
+        async (tx) => {
+          const created = await tx.order.create({
+            data: {
+              ...orderBase,
+              taxCents: 0,
+              totalCents: totals.totalCents,
+            },
+          });
+
+          await tx.invoice.create({
+            data: {
+              orderId: created.id,
+              invoiceNumber,
+              status: "DRAFT",
+              subtotalCents: totals.subtotalCents,
+              discountCents: totals.discountCents,
+              taxCents: 0,
+              totalCents: totals.totalCents,
+              notes:
+                "Hanging-weight items — final total after weigh-in. Customer notified when invoice is issued.",
+              lines: { create: lines },
+            },
+          });
+
+          for (const item of enrichedCart) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { inventoryCount: { decrement: item.quantity } },
+            });
+          }
+
+          if (appliedCoupon) {
+            await recordCouponRedemption(
+              {
+                couponId: appliedCoupon.coupon.id,
+                orderId: created.id,
+                userId: checkoutUser.userId,
+                discountCents,
+              },
+              tx,
+            );
+          }
+
+          return created;
+        },
+        { isolationLevel: "Serializable" },
+      );
+    } catch (error) {
+      console.error("Deferred invoice checkout failed:", error);
+      return { error: "Unable to place order. Please try again." };
+    }
+
+    if (wantNewsletter) {
+      await subscribeToNewsletter({
+        email: checkoutUser.email,
+        source: "CHECKOUT",
+        userId: checkoutUser.userId,
+        sendWelcome: true,
+      });
+    }
+
+    try {
+      await sendOrderReceivedEmail({
+        to: checkoutUser.email,
+        customerName: parsed.data.name,
+        invoiceNumber,
+        orderId: order.id,
+      });
+    } catch (error) {
+      console.error("Order received email failed:", error);
+    }
+
+    await setCart([]);
+    await setAppliedCouponCode(null);
+    const confirm = createOrderConfirmToken(order.id);
+    redirect(
+      `/checkout/success?order_id=${order.id}&confirm=${encodeURIComponent(confirm)}&deferred=1${
+        checkoutUser.isGuest ? "&guest=1" : ""
+      }`,
+    );
+  }
+
   // Cash / check — place order without Stripe card charge
   if (paymentMethod !== PaymentMethod.CARD) {
     const invoiceNumber = await nextInvoiceNumber();
+    const lines = buildInvoiceLinesFromCart(
+      enrichedCart.map((item) => ({
+        productId: item.productId,
+        name: item.name,
+        quantity: item.quantity,
+        priceCents: item.priceCents,
+        pricingMode: "FIXED" as const,
+        estimatedLbs: null,
+        weightLabel: item.weightLabel ?? null,
+      })),
+    );
+    const totals = recalculateInvoiceTotals({
+      lines,
+      discountCents,
+      taxCents: taxQuote.taxCents,
+    });
 
     let order;
     try {
@@ -279,10 +437,17 @@ export async function createCheckoutSessionAction(
             data: {
               orderId: created.id,
               invoiceNumber,
+              status: "ISSUED",
+              subtotalCents: totals.subtotalCents,
+              discountCents: totals.discountCents,
+              taxCents: totals.taxCents,
+              totalCents: totals.totalCents,
+              issuedAt: new Date(),
+              lines: { create: lines },
             },
           });
 
-          for (const item of cart) {
+          for (const item of enrichedCart) {
             await tx.product.update({
               where: { id: item.productId },
               data: { inventoryCount: { decrement: item.quantity } },
@@ -381,7 +546,7 @@ export async function createCheckoutSessionAction(
     });
 
     const lineItems = [];
-    for (const item of cart) {
+    for (const item of enrichedCart) {
       const priceId = await ensureProductSynced(item.productId);
       if (priceId) {
         lineItems.push({ price: priceId, quantity: item.quantity });

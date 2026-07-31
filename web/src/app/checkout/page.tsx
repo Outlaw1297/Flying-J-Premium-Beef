@@ -5,7 +5,7 @@ import { applyCouponCodeIfValid } from "@/lib/coupons";
 import { CouponField } from "@/components/cart/coupon-field";
 import { CheckoutForm } from "@/components/checkout/checkout-form";
 import { auth } from "@/lib/auth";
-import { getCart, getCartSubtotal } from "@/lib/cart";
+import { getCart, getCartSubtotal, cartHasHangingWeight } from "@/lib/cart";
 import { resolveAppliedCoupon } from "@/lib/coupons";
 import { formatCents } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -50,7 +50,21 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
     : null;
 
   const isSignedIn = Boolean(session?.user?.id && user?.passwordHash);
-  const subtotal = getCartSubtotal(cart);
+
+  // Refresh pricing modes from DB for hanging-weight detection
+  const products = await prisma.product.findMany({
+    where: { id: { in: cart.map((i) => i.productId) } },
+    select: { id: true, pricingMode: true, estimatedLbs: true, priceCents: true },
+  });
+  const byId = Object.fromEntries(products.map((p) => [p.id, p]));
+  const enriched = cart.map((item) => ({
+    ...item,
+    pricingMode: byId[item.productId]?.pricingMode ?? item.pricingMode,
+    estimatedLbs: byId[item.productId]?.estimatedLbs ?? item.estimatedLbs,
+    priceCents: byId[item.productId]?.priceCents ?? item.priceCents,
+  }));
+  const hasHangingWeight = cartHasHangingWeight(enriched);
+  const subtotal = getCartSubtotal(enriched);
   const applied = await resolveAppliedCoupon(subtotal);
   const discountCents = applied?.discountCents ?? 0;
 
@@ -88,6 +102,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
               emailLocked={isSignedIn}
               isGuestCheckout={!isSignedIn}
               newsletterDefault={!user?.newsletterSubscribed}
+              hasHangingWeight={hasHangingWeight}
               subtotalCents={subtotal}
               discountCents={discountCents}
               defaultAddress={{

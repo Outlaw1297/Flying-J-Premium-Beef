@@ -73,6 +73,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
               category={product.category}
               inventoryCount={product.inventoryCount}
               imageUrl={product.imageUrl}
+              pricingMode={product.pricingMode}
             />
           ))}
         </div>

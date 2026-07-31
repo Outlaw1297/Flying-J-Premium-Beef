@@ -60,6 +60,8 @@ export async function addToCartAction(
           priceCents: product.priceCents,
           weightLabel: product.weightLabel,
           quantity,
+          pricingMode: product.pricingMode,
+          estimatedLbs: product.estimatedLbs,
         },
       ];
 

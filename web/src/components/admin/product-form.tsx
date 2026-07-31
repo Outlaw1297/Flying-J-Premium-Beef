@@ -29,6 +29,8 @@ export function ProductForm({
     category: string | null;
     imageUrl: string | null;
     stripeTaxCode?: string | null;
+    pricingMode?: "FIXED" | "PER_POUND_HANGING";
+    estimatedLbs?: number | null;
     active: boolean;
   } | null;
 }) {
@@ -116,6 +118,41 @@ export function ProductForm({
             }
             className={inputClass}
           />
+          <p className="mt-1 text-xs text-charcoal/50">
+            Package price, or $ per hanging lb for halves/quarters.
+          </p>
+        </div>
+        <div>
+          <label htmlFor="pricingMode" className="block text-sm font-medium text-charcoal">
+            Pricing
+          </label>
+          <select
+            id="pricingMode"
+            name="pricingMode"
+            defaultValue={product?.pricingMode ?? "FIXED"}
+            className={inputClass}
+          >
+            <option value="FIXED">Fixed package price</option>
+            <option value="PER_POUND_HANGING">Per lb hanging weight</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="estimatedLbs" className="block text-sm font-medium text-charcoal">
+            Est. hanging lbs
+          </label>
+          <input
+            id="estimatedLbs"
+            name="estimatedLbs"
+            type="number"
+            step="0.1"
+            min="0"
+            defaultValue={product?.estimatedLbs ?? ""}
+            placeholder="e.g. 350 for a half"
+            className={inputClass}
+          />
+          <p className="mt-1 text-xs text-charcoal/50">
+            Optional estimate shown at checkout. Final lbs set on the invoice.
+          </p>
         </div>
         <div>
           <label htmlFor="inventoryCount" className="block text-sm font-medium text-charcoal">
