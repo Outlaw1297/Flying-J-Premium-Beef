@@ -6,6 +6,13 @@ import { auth } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Help center",
+  description:
+    "FAQs for Flying J Premium Beef — pickup, delivery, storage, cuts, and how to contact support.",
+  openGraph: {
+    title: "Help center | Flying J Premium Beef",
+    description:
+      "Answers about orders, cuts, pickup, and delivery for Flying J Premium Beef.",
+  },
 };
 
 export default async function HelpPage() {
