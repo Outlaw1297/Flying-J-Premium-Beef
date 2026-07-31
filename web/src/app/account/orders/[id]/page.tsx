@@ -195,10 +195,12 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
       )}
 
       <Link
-        href="/account/support"
-        className="mt-8 inline-flex text-sm font-medium text-copper hover:underline"
+        href={`/account/support/new?orderId=${order.id}&subject=${encodeURIComponent(
+          `Help with ${order.invoice?.invoiceNumber ?? `order ${order.id.slice(-6)}`}`,
+        )}`}
+        className="mt-8 inline-flex rounded-full bg-copper px-5 py-2.5 text-sm font-semibold text-cream hover:bg-copper/90"
       >
-        Need help with this order?
+        Get help with this order
       </Link>
     </div>
   );
