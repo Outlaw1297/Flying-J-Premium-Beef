@@ -10,16 +10,60 @@ import { formatPhoneDisplay, normalizeUsPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { FulfillmentType, PaymentMethod } from "@/generated/prisma/enums";
 
-const checkoutSchema = z.object({
-  name: z.string().min(1, "Name is required").max(100),
-  phone: z.string().min(7, "Phone is required").max(30),
-  fulfillmentType: z.enum(["PICKUP", "DELIVERY"]),
-  paymentMethod: z.enum(["CARD", "CASH", "CHECK"]),
-  pickupDate: z.string().optional(),
-  notes: z.string().max(500).optional(),
-});
+const checkoutSchema = z
+  .object({
+    name: z.string().min(1, "Name is required").max(100),
+    phone: z.string().min(7, "Phone is required").max(30),
+    fulfillmentType: z.enum(["PICKUP", "DELIVERY"]),
+    paymentMethod: z.enum(["CARD", "CASH", "CHECK"]),
+    pickupDate: z.string().optional(),
+    notes: z.string().max(500).optional(),
+    addressLine1: z.string().max(120).optional(),
+    addressLine2: z.string().max(120).optional(),
+    city: z.string().max(80).optional(),
+    state: z.string().max(2).optional(),
+    zip: z.string().max(10).optional(),
+    deliveryInstructions: z.string().max(500).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.fulfillmentType !== "DELIVERY") return;
+
+    if (!data.addressLine1?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Street address is required for delivery",
+        path: ["addressLine1"],
+      });
+    }
+    if (!data.city?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "City is required for delivery",
+        path: ["city"],
+      });
+    }
+    if (!data.state?.trim() || data.state.trim().length !== 2) {
+      ctx.addIssue({
+        code: "custom",
+        message: "2-letter state is required for delivery",
+        path: ["state"],
+      });
+    }
+    if (!data.zip?.trim() || !/^\d{5}(-\d{4})?$/.test(data.zip.trim())) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Valid ZIP code is required for delivery",
+        path: ["zip"],
+      });
+    }
+  });
 
 export type CheckoutState = { error?: string };
+
+function emptyToNull(value?: string) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
 
 async function validateCart(cart: CartItem[]) {
   if (cart.length === 0) {
@@ -70,6 +114,12 @@ export async function createCheckoutSessionAction(
     paymentMethod: formData.get("paymentMethod"),
     pickupDate: formData.get("pickupDate") || undefined,
     notes: formData.get("notes") || undefined,
+    addressLine1: formData.get("addressLine1") || undefined,
+    addressLine2: formData.get("addressLine2") || undefined,
+    city: formData.get("city") || undefined,
+    state: formData.get("state") || undefined,
+    zip: formData.get("zip") || undefined,
+    deliveryInstructions: formData.get("deliveryInstructions") || undefined,
   });
 
   if (!parsed.success) {
@@ -109,41 +159,61 @@ export async function createCheckoutSessionAction(
     }
   }
 
+  const addressFields = {
+    addressLine1: emptyToNull(parsed.data.addressLine1),
+    addressLine2: emptyToNull(parsed.data.addressLine2),
+    city: emptyToNull(parsed.data.city),
+    state: emptyToNull(parsed.data.state?.toUpperCase()),
+    zip: emptyToNull(parsed.data.zip),
+    deliveryInstructions: emptyToNull(parsed.data.deliveryInstructions),
+  };
+
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
       name: parsed.data.name,
       phone: phoneFormatted,
+      preferredFulfillment: fulfillmentType,
+      ...(fulfillmentType === FulfillmentType.DELIVERY
+        ? {
+            addressLine1: addressFields.addressLine1,
+            addressLine2: addressFields.addressLine2,
+            city: addressFields.city,
+            state: addressFields.state,
+            zip: addressFields.zip,
+          }
+        : {}),
     },
   });
+
+  const orderBase = {
+    userId: session.user.id,
+    status: "PENDING" as const,
+    paymentMethod,
+    subtotalCents,
+    discountCents: 0,
+    taxCents: 0,
+    totalCents: subtotalCents,
+    fulfillmentType,
+    pickupDate,
+    notes: emptyToNull(parsed.data.notes),
+    ...addressFields,
+    items: {
+      create: cart.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        priceCents: item.priceCents,
+        productNameSnapshot: item.name,
+      })),
+    },
+  };
 
   // Cash / check — place order without Stripe
   if (paymentMethod !== PaymentMethod.CARD) {
     const invoiceNumber = await nextInvoiceNumber();
 
     const order = await prisma.$transaction(async (tx) => {
-      const created = await tx.order.create({
-        data: {
-          userId: session.user.id,
-          status: "PENDING",
-          paymentMethod,
-          subtotalCents,
-          discountCents: 0,
-          taxCents: 0,
-          totalCents: subtotalCents,
-          fulfillmentType,
-          pickupDate,
-          notes: parsed.data.notes,
-          items: {
-            create: cart.map((item) => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              priceCents: item.priceCents,
-              productNameSnapshot: item.name,
-            })),
-          },
-        },
-      });
+      const created = await tx.order.create({ data: orderBase });
 
       await tx.invoice.create({
         data: {
@@ -176,24 +246,8 @@ export async function createCheckoutSessionAction(
 
   const order = await prisma.order.create({
     data: {
-      userId: session.user.id,
-      status: "PENDING",
+      ...orderBase,
       paymentMethod: PaymentMethod.CARD,
-      subtotalCents,
-      discountCents: 0,
-      taxCents: 0,
-      totalCents: subtotalCents,
-      fulfillmentType,
-      pickupDate,
-      notes: parsed.data.notes,
-      items: {
-        create: cart.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          priceCents: item.priceCents,
-          productNameSnapshot: item.name,
-        })),
-      },
     },
   });
 

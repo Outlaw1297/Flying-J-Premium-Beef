@@ -78,38 +78,41 @@ export default async function OrdersPage() {
                 key={order.id}
                 className="rounded-2xl border border-charcoal/10 bg-white p-6 shadow-sm"
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-display text-lg font-semibold text-charcoal">
-                      {order.invoice?.invoiceNumber ?? `Order ${order.id.slice(-6)}`}
-                    </p>
-                    <p className="mt-1 text-sm text-charcoal/60">
-                      {order.createdAt.toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                      {" · "}
-                      {order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}
-                    </p>
+                <Link href={`/account/orders/${order.id}`} className="block group">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-display text-lg font-semibold text-charcoal group-hover:text-copper transition-colors">
+                        {order.invoice?.invoiceNumber ?? `Order ${order.id.slice(-6)}`}
+                      </p>
+                      <p className="mt-1 text-sm text-charcoal/60">
+                        {order.createdAt.toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                        {" · "}
+                        {order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-cream px-3 py-1 text-xs font-semibold uppercase tracking-wide text-charcoal/70">
+                      {badge}
+                    </span>
                   </div>
-                  <span className="rounded-full bg-cream px-3 py-1 text-xs font-semibold uppercase tracking-wide text-charcoal/70">
-                    {badge}
-                  </span>
-                </div>
-                <ul className="mt-4 space-y-1 text-sm text-charcoal/70">
-                  {order.items.map((item) => (
-                    <li key={item.id}>
-                      {item.quantity}× {item.productNameSnapshot}
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-4 text-sm font-semibold text-charcoal">
-                  Total {formatCents(order.totalCents)}
-                </p>
-                {payNote && (
-                  <p className="mt-1 text-sm text-copper">{payNote}</p>
-                )}
+                  <ul className="mt-4 space-y-1 text-sm text-charcoal/70">
+                    {order.items.map((item) => (
+                      <li key={item.id}>
+                        {item.quantity}× {item.productNameSnapshot}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-4 text-sm font-semibold text-charcoal">
+                    Total {formatCents(order.totalCents)}
+                  </p>
+                  {payNote && (
+                    <p className="mt-1 text-sm text-copper">{payNote}</p>
+                  )}
+                  <p className="mt-3 text-sm font-medium text-copper">View details →</p>
+                </Link>
               </li>
             );
           })}

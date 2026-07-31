@@ -9,12 +9,25 @@ import { formatPhoneDisplay, formatPhoneInput } from "@/lib/phone";
 
 const initialState: CheckoutState = {};
 
+const inputClass =
+  "mt-1.5 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2.5 text-charcoal shadow-sm focus:border-copper focus:outline-none focus:ring-2 focus:ring-copper/20";
+
 export function CheckoutForm({
   defaultName,
   defaultPhone,
+  defaultAddress,
+  defaultFulfillment,
 }: {
   defaultName?: string | null;
   defaultPhone?: string | null;
+  defaultFulfillment?: "PICKUP" | "DELIVERY" | null;
+  defaultAddress?: {
+    addressLine1?: string | null;
+    addressLine2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip?: string | null;
+  };
 }) {
   const [state, formAction, pending] = useActionState(
     createCheckoutSessionAction,
@@ -23,6 +36,9 @@ export function CheckoutForm({
   const [phone, setPhone] = useState(formatPhoneDisplay(defaultPhone) || "");
   const [paymentMethod, setPaymentMethod] = useState<"CARD" | "CASH" | "CHECK">(
     "CARD",
+  );
+  const [fulfillmentType, setFulfillmentType] = useState<"PICKUP" | "DELIVERY">(
+    defaultFulfillment === "DELIVERY" ? "DELIVERY" : "PICKUP",
   );
 
   const submitLabel =
@@ -53,7 +69,7 @@ export function CheckoutForm({
             type="text"
             required
             defaultValue={defaultName ?? ""}
-            className="mt-1.5 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2.5 text-charcoal shadow-sm focus:border-copper focus:outline-none focus:ring-2 focus:ring-copper/20"
+            className={inputClass}
           />
         </div>
         <div>
@@ -70,7 +86,7 @@ export function CheckoutForm({
             placeholder="(555) 123-4567"
             value={phone}
             onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
-            className="mt-1.5 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2.5 text-charcoal shadow-sm focus:border-copper focus:outline-none focus:ring-2 focus:ring-copper/20"
+            className={inputClass}
           />
         </div>
       </div>
@@ -83,7 +99,8 @@ export function CheckoutForm({
               type="radio"
               name="fulfillmentType"
               value="PICKUP"
-              defaultChecked
+              checked={fulfillmentType === "PICKUP"}
+              onChange={() => setFulfillmentType("PICKUP")}
               className="mt-1"
             />
             <span>
@@ -94,7 +111,14 @@ export function CheckoutForm({
             </span>
           </label>
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-charcoal/15 bg-white p-4 has-[:checked]:border-copper has-[:checked]:ring-1 has-[:checked]:ring-copper">
-            <input type="radio" name="fulfillmentType" value="DELIVERY" className="mt-1" />
+            <input
+              type="radio"
+              name="fulfillmentType"
+              value="DELIVERY"
+              checked={fulfillmentType === "DELIVERY"}
+              onChange={() => setFulfillmentType("DELIVERY")}
+              className="mt-1"
+            />
             <span>
               <span className="block font-medium text-charcoal">Local delivery</span>
               <span className="mt-0.5 block text-xs text-charcoal/60">
@@ -105,57 +129,153 @@ export function CheckoutForm({
         </div>
       </fieldset>
 
+      {fulfillmentType === "DELIVERY" && (
+        <fieldset className="space-y-4 rounded-2xl border border-charcoal/10 bg-cream/40 p-4">
+          <legend className="px-1 text-sm font-medium text-charcoal">
+            Delivery address
+          </legend>
+
+          <div>
+            <label htmlFor="addressLine1" className="block text-sm font-medium text-charcoal">
+              Street address
+            </label>
+            <input
+              id="addressLine1"
+              name="addressLine1"
+              type="text"
+              required
+              autoComplete="address-line1"
+              defaultValue={defaultAddress?.addressLine1 ?? ""}
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="addressLine2" className="block text-sm font-medium text-charcoal">
+              Apt / suite{" "}
+              <span className="font-normal text-charcoal/50">(optional)</span>
+            </label>
+            <input
+              id="addressLine2"
+              name="addressLine2"
+              type="text"
+              autoComplete="address-line2"
+              defaultValue={defaultAddress?.addressLine2 ?? ""}
+              className={inputClass}
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-6">
+            <div className="sm:col-span-3">
+              <label htmlFor="city" className="block text-sm font-medium text-charcoal">
+                City
+              </label>
+              <input
+                id="city"
+                name="city"
+                type="text"
+                required
+                autoComplete="address-level2"
+                defaultValue={defaultAddress?.city ?? ""}
+                className={inputClass}
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <label htmlFor="state" className="block text-sm font-medium text-charcoal">
+                State
+              </label>
+              <input
+                id="state"
+                name="state"
+                type="text"
+                required
+                maxLength={2}
+                autoComplete="address-level1"
+                placeholder="TX"
+                defaultValue={defaultAddress?.state ?? ""}
+                className={`${inputClass} uppercase`}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="zip" className="block text-sm font-medium text-charcoal">
+                ZIP
+              </label>
+              <input
+                id="zip"
+                name="zip"
+                type="text"
+                required
+                autoComplete="postal-code"
+                inputMode="numeric"
+                placeholder="12345"
+                defaultValue={defaultAddress?.zip ?? ""}
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="deliveryInstructions"
+              className="block text-sm font-medium text-charcoal"
+            >
+              Delivery instructions
+            </label>
+            <textarea
+              id="deliveryInstructions"
+              name="deliveryInstructions"
+              rows={3}
+              maxLength={500}
+              placeholder="Gate code, where to leave coolers, dogs, landmarks…"
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-charcoal/50">
+              Helps our team find you and handle the delivery safely.
+            </p>
+          </div>
+        </fieldset>
+      )}
+
       <fieldset>
         <legend className="text-sm font-medium text-charcoal">Payment</legend>
         <div className="mt-3 space-y-3">
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-charcoal/15 bg-white p-4 has-[:checked]:border-copper has-[:checked]:ring-1 has-[:checked]:ring-copper">
-            <input
-              type="radio"
-              name="paymentMethod"
-              value="CARD"
-              checked={paymentMethod === "CARD"}
-              onChange={() => setPaymentMethod("CARD")}
-              className="mt-1"
-            />
-            <span>
-              <span className="block font-medium text-charcoal">Pay with card</span>
-              <span className="mt-0.5 block text-xs text-charcoal/60">
-                Secure checkout with Stripe
+          {(
+            [
+              {
+                value: "CARD" as const,
+                title: "Pay with card",
+                body: "Secure checkout with Stripe",
+              },
+              {
+                value: "CASH" as const,
+                title: "Cash at pickup / delivery",
+                body: "Pay when you receive your order",
+              },
+              {
+                value: "CHECK" as const,
+                title: "Check at pickup / delivery",
+                body: "Bring a check when you receive your order",
+              },
+            ] as const
+          ).map((option) => (
+            <label
+              key={option.value}
+              className="flex cursor-pointer items-start gap-3 rounded-xl border border-charcoal/15 bg-white p-4 has-[:checked]:border-copper has-[:checked]:ring-1 has-[:checked]:ring-copper"
+            >
+              <input
+                type="radio"
+                name="paymentMethod"
+                value={option.value}
+                checked={paymentMethod === option.value}
+                onChange={() => setPaymentMethod(option.value)}
+                className="mt-1"
+              />
+              <span>
+                <span className="block font-medium text-charcoal">{option.title}</span>
+                <span className="mt-0.5 block text-xs text-charcoal/60">{option.body}</span>
               </span>
-            </span>
-          </label>
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-charcoal/15 bg-white p-4 has-[:checked]:border-copper has-[:checked]:ring-1 has-[:checked]:ring-copper">
-            <input
-              type="radio"
-              name="paymentMethod"
-              value="CASH"
-              checked={paymentMethod === "CASH"}
-              onChange={() => setPaymentMethod("CASH")}
-              className="mt-1"
-            />
-            <span>
-              <span className="block font-medium text-charcoal">Cash at pickup / delivery</span>
-              <span className="mt-0.5 block text-xs text-charcoal/60">
-                Pay when you receive your order
-              </span>
-            </span>
-          </label>
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-charcoal/15 bg-white p-4 has-[:checked]:border-copper has-[:checked]:ring-1 has-[:checked]:ring-copper">
-            <input
-              type="radio"
-              name="paymentMethod"
-              value="CHECK"
-              checked={paymentMethod === "CHECK"}
-              onChange={() => setPaymentMethod("CHECK")}
-              className="mt-1"
-            />
-            <span>
-              <span className="block font-medium text-charcoal">Check at pickup / delivery</span>
-              <span className="mt-0.5 block text-xs text-charcoal/60">
-                Bring a check when you receive your order
-              </span>
-            </span>
-          </label>
+            </label>
+          ))}
         </div>
       </fieldset>
 
@@ -168,7 +288,7 @@ export function CheckoutForm({
           name="pickupDate"
           type="date"
           min={new Date().toISOString().slice(0, 10)}
-          className="mt-1.5 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2.5 text-charcoal shadow-sm focus:border-copper focus:outline-none focus:ring-2 focus:ring-copper/20 sm:max-w-xs"
+          className={`${inputClass} sm:max-w-xs`}
         />
       </div>
 
@@ -182,7 +302,7 @@ export function CheckoutForm({
           rows={3}
           maxLength={500}
           placeholder="Special instructions, cut preferences…"
-          className="mt-1.5 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2.5 text-charcoal shadow-sm focus:border-copper focus:outline-none focus:ring-2 focus:ring-copper/20"
+          className={inputClass}
         />
       </div>
 

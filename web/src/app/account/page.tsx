@@ -22,8 +22,17 @@ export default async function AccountPage() {
           <p className="mt-2 text-sm text-charcoal/60">View order history and invoices</p>
         </Link>
         <Link
-          href="/account/support"
+          href="/account/profile"
           className="rounded-2xl border border-charcoal/10 bg-white p-6 shadow-sm hover:border-copper/40 transition-colors"
+        >
+          <h2 className="font-display text-lg font-semibold">Profile</h2>
+          <p className="mt-2 text-sm text-charcoal/60">
+            Name, phone, address, and pickup preference
+          </p>
+        </Link>
+        <Link
+          href="/account/support"
+          className="rounded-2xl border border-charcoal/10 bg-white p-6 shadow-sm hover:border-copper/40 transition-colors sm:col-span-2"
         >
           <h2 className="font-display text-lg font-semibold">Support</h2>
           <p className="mt-2 text-sm text-charcoal/60">Get help with orders and pickup</p>

@@ -24,7 +24,17 @@ export default async function CheckoutPage() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { name: true, phone: true, email: true },
+    select: {
+      name: true,
+      phone: true,
+      email: true,
+      addressLine1: true,
+      addressLine2: true,
+      city: true,
+      state: true,
+      zip: true,
+      preferredFulfillment: true,
+    },
   });
 
   const subtotal = getCartSubtotal(cart);
@@ -35,13 +45,24 @@ export default async function CheckoutPage() {
         Checkout
       </h1>
       <p className="mt-2 text-charcoal/70">
-        Confirm your details, then pay securely with Stripe.
+        Confirm your details, address for delivery, then choose how to pay.
       </p>
 
       <div className="mt-10 grid gap-10 lg:grid-cols-5">
         <div className="lg:col-span-3">
           <div className="rounded-2xl border border-charcoal/10 bg-white p-6 shadow-sm">
-            <CheckoutForm defaultName={user?.name} defaultPhone={user?.phone} />
+            <CheckoutForm
+              defaultName={user?.name}
+              defaultPhone={user?.phone}
+              defaultFulfillment={user?.preferredFulfillment}
+              defaultAddress={{
+                addressLine1: user?.addressLine1,
+                addressLine2: user?.addressLine2,
+                city: user?.city,
+                state: user?.state,
+                zip: user?.zip,
+              }}
+            />
           </div>
         </div>
 

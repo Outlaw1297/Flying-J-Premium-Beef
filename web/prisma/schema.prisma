@@ -68,15 +68,21 @@ enum AuthorType {
 }
 
 model User {
-  id                   String   @id @default(cuid())
-  email                String   @unique
-  passwordHash         String   @map("password_hash")
+  id                   String            @id @default(cuid())
+  email                String            @unique
+  passwordHash         String            @map("password_hash")
   name                 String?
   phone                String?
-  role                 UserRole @default(CUSTOMER)
-  newsletterSubscribed Boolean  @default(false) @map("newsletter_subscribed")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  role                 UserRole          @default(CUSTOMER)
+  newsletterSubscribed Boolean           @default(false) @map("newsletter_subscribed")
+  addressLine1         String?           @map("address_line1")
+  addressLine2         String?           @map("address_line2")
+  city                 String?
+  state                String?
+  zip                  String?
+  preferredFulfillment FulfillmentType?  @map("preferred_fulfillment")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
 
   orders              Order[]
   couponRedemptions   CouponRedemption[]
@@ -120,6 +126,12 @@ model Order {
   paymentMethod         PaymentMethod   @default(CARD) @map("payment_method")
   pickupDate            DateTime?       @map("pickup_date")
   notes                 String?
+  addressLine1          String?         @map("address_line1")
+  addressLine2          String?         @map("address_line2")
+  city                  String?
+  state                 String?
+  zip                   String?
+  deliveryInstructions  String?         @map("delivery_instructions")
   couponId              String?         @map("coupon_id")
   createdAt             DateTime        @default(now()) @map("created_at")
   updatedAt             DateTime        @updatedAt @map("updated_at")
