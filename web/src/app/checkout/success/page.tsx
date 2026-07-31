@@ -185,21 +185,7 @@ export default async function CheckoutSuccessPage({
           >
             View order
           </Link>
-        ) : showAccountCta ? (
-          <Link
-            href={registerHref}
-            className="inline-flex justify-center rounded-full bg-charcoal px-6 py-3 text-sm font-semibold text-cream hover:bg-charcoal/90 transition-colors"
-          >
-            Create account
-          </Link>
-        ) : (
-          <Link
-            href="/account"
-            className="inline-flex justify-center rounded-full bg-charcoal px-6 py-3 text-sm font-semibold text-cream hover:bg-charcoal/90 transition-colors"
-          >
-            Your account
-          </Link>
-        )}
+        ) : null}
         <Link
           href="/shop"
           className="inline-flex justify-center rounded-full border border-charcoal/15 px-6 py-3 text-sm font-medium text-charcoal hover:border-charcoal/30 transition-colors"
