@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
-import { SiteHeader } from "./site-header";
+import { getCartItemCount } from "@/lib/cart";
 
 const navLinks = [
   { href: "/shop", label: "Shop" },
@@ -8,8 +8,9 @@ const navLinks = [
   { href: "/help", label: "Help" },
 ];
 
-export async function SiteHeaderAuth() {
+export async function SiteHeader() {
   const session = await auth();
+  const cartCount = await getCartItemCount();
 
   return (
     <header className="sticky top-0 z-50 border-b border-charcoal/10 bg-cream/95 backdrop-blur-sm">
@@ -43,9 +44,14 @@ export async function SiteHeaderAuth() {
         <div className="flex items-center gap-2 sm:gap-3">
           <Link
             href="/cart"
-            className="hidden rounded-full border border-charcoal/15 px-3 py-1.5 text-sm font-medium text-charcoal hover:border-copper hover:text-copper transition-colors sm:inline-flex"
+            className="hidden items-center gap-1.5 rounded-full border border-charcoal/15 px-3 py-1.5 text-sm font-medium text-charcoal hover:border-copper hover:text-copper transition-colors sm:inline-flex"
           >
             Cart
+            {cartCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-copper px-1.5 text-xs font-semibold text-cream">
+                {cartCount}
+              </span>
+            )}
           </Link>
           {session?.user ? (
             <Link
@@ -67,6 +73,3 @@ export async function SiteHeaderAuth() {
     </header>
   );
 }
-
-// Keep default export for backwards compat - use auth version in shell
-export { SiteHeaderAuth as SiteHeader };

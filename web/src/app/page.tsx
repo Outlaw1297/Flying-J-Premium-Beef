@@ -74,13 +74,13 @@ export default function HomePage() {
             Ready to order?
           </h2>
           <p className="mt-4 text-charcoal/70">
-            Browse steaks, ground beef, and bundles — pickup available locally.
+            Browse steaks, ground beef, and bundles — add to cart for pickup.
           </p>
           <Link
             href="/shop"
             className="mt-8 inline-flex rounded-full bg-charcoal px-8 py-3.5 text-sm font-semibold text-cream hover:bg-charcoal/90 transition-colors"
           >
-            View shop
+            Shop now
           </Link>
         </div>
       </section>
