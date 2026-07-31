@@ -1,48 +1,39 @@
 "use client";
 
-import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useActionState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { loginAction, type LoginState } from "@/app/login/actions";
+
+const initialState: LoginState = {};
+
+function urlErrorMessage(error: string | null): string | null {
+  if (!error) return null;
+  if (error === "MissingCSRF") {
+    return "Session expired. Please try signing in again.";
+  }
+  if (error === "CredentialsSignin") {
+    return "Invalid email or password";
+  }
+  return "Unable to sign in. Please try again.";
+}
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/account";
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const urlError = urlErrorMessage(searchParams.get("error"));
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
+  const [state, formAction, pending] = useActionState(loginAction, initialState);
 
-    const form = new FormData(e.currentTarget);
-    const email = form.get("email") as string;
-    const password = form.get("password") as string;
-
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
-
-    setLoading(false);
-
-    if (result?.error) {
-      setError("Invalid email or password");
-      return;
-    }
-
-    router.push(callbackUrl);
-    router.refresh();
-  }
+  const displayError = state.error ?? urlError;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      {error && (
+    <form action={formAction} className="space-y-5">
+      <input type="hidden" name="callbackUrl" value={callbackUrl} />
+
+      {displayError && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          {displayError}
         </div>
       )}
 
@@ -77,10 +68,10 @@ export function LoginForm() {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={pending}
         className="w-full rounded-full bg-charcoal py-3 text-sm font-semibold text-cream hover:bg-charcoal/90 disabled:opacity-60 transition-colors"
       >
-        {loading ? "Signing in…" : "Sign in"}
+        {pending ? "Signing in…" : "Sign in"}
       </button>
 
       <p className="text-center text-sm text-charcoal/60">

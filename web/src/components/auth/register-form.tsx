@@ -1,61 +1,19 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useActionState } from "react";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { registerAction, type RegisterState } from "@/app/register/actions";
+
+const initialState: RegisterState = {};
 
 export function RegisterForm() {
-  const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    const form = new FormData(e.currentTarget);
-    const name = form.get("name") as string;
-    const email = form.get("email") as string;
-    const password = form.get("password") as string;
-
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      setLoading(false);
-      setError(data.error ?? "Registration failed");
-      return;
-    }
-
-    const signInResult = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
-
-    setLoading(false);
-
-    if (signInResult?.error) {
-      setError("Account created but sign-in failed. Please log in.");
-      return;
-    }
-
-    router.push("/account");
-    router.refresh();
-  }
+  const [state, formAction, pending] = useActionState(registerAction, initialState);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      {error && (
+    <form action={formAction} className="space-y-5">
+      {state.error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          {state.error}
         </div>
       )}
 
@@ -105,10 +63,10 @@ export function RegisterForm() {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={pending}
         className="w-full rounded-full bg-charcoal py-3 text-sm font-semibold text-cream hover:bg-charcoal/90 disabled:opacity-60 transition-colors"
       >
-        {loading ? "Creating account…" : "Create account"}
+        {pending ? "Creating account…" : "Create account"}
       </button>
 
       <p className="text-center text-sm text-charcoal/60">
