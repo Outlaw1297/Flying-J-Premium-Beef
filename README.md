@@ -27,38 +27,30 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Requires Docker Engine + Docker Compose v2.
 
+### Zero-config (Portainer / mobile)
+
+Deploy `docker-compose.yml` with **no environment variables required**.
+
+On first boot the web container will:
+- generate and persist `AUTH_SECRET`
+- generate an admin password, print it in the **web container logs**, and save it under `/app/data/admin_password`
+
+Default admin email: `admin@flyingjbeef.com`
+
+Optional later (when you can type more easily):
+- `NEXTAUTH_URL=https://your-domain.example`
+- `SEED_ON_START=false` after first successful login
+
+### CLI
+
 ```bash
 chmod +x scripts/docker-init-env.sh
-./scripts/docker-init-env.sh
-# Edit .env — set NEXTAUTH_URL to your public URL if not localhost
+./scripts/docker-init-env.sh   # optional — pre-writes secrets into .env
 docker compose up -d --build
 ```
-
-Or manually:
-
-```bash
-cp .env.docker.example .env
-# AUTH_SECRET and NEXTAUTH_SECRET must be non-empty (openssl rand -base64 32)
-# Also set SEED_ADMIN_PASSWORD, POSTGRES_PASSWORD, NEXTAUTH_URL
-docker compose up -d --build
-```
-
-### Portainer / “Deploy stack”
-
-Compose interpolation needs these **stack environment variables** set in the UI (or a `.env` next to the compose file). Empty `AUTH_SECRET=` causes deploy to fail.
-
-| Variable | Example |
-|---|---|
-| `AUTH_SECRET` | output of `openssl rand -base64 32` |
-| `NEXTAUTH_SECRET` | same value as `AUTH_SECRET` |
-| `POSTGRES_PASSWORD` | strong DB password |
-| `SEED_ADMIN_PASSWORD` | admin login password |
-| `NEXTAUTH_URL` | `https://your-domain.example` |
-| `SEED_ON_START` | `true` (first boot), then `false` |
 
 - App: `http://localhost:3000` (or your `NEXTAUTH_URL` behind a reverse proxy)
-- Admin: `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`
-- First boot runs migrations + seed when `SEED_ON_START=true`
+- First boot runs migrations + seed when `SEED_ON_START=true` (default)
 - After first successful login, set `SEED_ON_START=false` and redeploy/recreate `web`
 
 Useful commands:

@@ -46,8 +46,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/sentry.edge.config.ts ./sentry.ed
 
 # Drop build-only packages; tsx + dotenv stay via dependencies for migrate/seed
 RUN npm prune --omit=dev \
-  && mkdir -p public/uploads/products \
-  && chown -R nextjs:nodejs /app/public /app/node_modules \
+  && mkdir -p public/uploads/products /app/data \
+  && chown -R nextjs:nodejs /app/public /app/node_modules /app/data \
   && test -x node_modules/.bin/tsx \
   && test -x node_modules/.bin/prisma
 

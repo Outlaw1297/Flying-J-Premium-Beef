@@ -1,19 +1,17 @@
 # Flying J Premium Beef — self-host with Docker Compose
 #
-# Quick start (CLI):
-#   1. ./scripts/docker-init-env.sh
-#   2. Edit .env (at least NEXTAUTH_URL)
-#   3. docker compose up -d --build
+# Zero-config (Portainer / mobile):
+#   Deploy this compose file with no env vars required.
+#   AUTH_SECRET + admin password are auto-generated on first boot
+#   and persisted in the app_data volume. Check web container logs
+#   for the admin password.
 #
-# Portainer / stack UI:
-#   Add these environment variables before deploy (required):
-#     AUTH_SECRET, NEXTAUTH_SECRET  (same value, from: openssl rand -base64 32)
-#     SEED_ADMIN_PASSWORD           (your admin password)
-#     POSTGRES_PASSWORD             (database password)
-#     NEXTAUTH_URL                  (public site URL, e.g. https://beef.example.com)
+# Optional later:
+#   NEXTAUTH_URL=https://your-domain.example
+#   SEED_ON_START=false   (after first successful login)
 #
-# First boot creates the admin when SEED_ON_START=true and SEED_ADMIN_PASSWORD is set.
-# After that, set SEED_ON_START=false so restarts do not re-run seed side effects.
+# CLI with generated .env:
+#   ./scripts/docker-init-env.sh && docker compose up -d --build
 
 name: flying-j-beef
 
@@ -48,13 +46,14 @@ services:
       - "${APP_PORT:-3000}:3000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-flying_j}:${POSTGRES_PASSWORD:-flying_j_change_me}@db:5432/${POSTGRES_DB:-flying_j_beef}?schema=public
-      # Required — set in .env or Portainer stack env (openssl rand -base64 32)
+      # Optional — auto-generated + persisted in app_data if left blank
       AUTH_SECRET: ${AUTH_SECRET:-}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
       SEED_ON_START: ${SEED_ON_START:-true}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@flyingjbeef.com}
+      # Optional — auto-generated on first seed if left blank (printed in logs)
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
@@ -78,7 +77,10 @@ services:
     volumes:
       # Persist product photo uploads across container rebuilds
       - uploads_data:/app/public/uploads
+      # Persist auto-generated AUTH_SECRET + admin password
+      - app_data:/app/data
 
 volumes:
   postgres_data:
   uploads_data:
+  app_data:
