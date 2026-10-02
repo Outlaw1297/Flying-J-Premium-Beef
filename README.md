@@ -29,17 +29,26 @@ Requires Docker Engine + Docker Compose v2.
 
 ### Zero-config (Portainer / mobile)
 
-Deploy `docker-compose.yml` with **no environment variables required**.
+Stacks → Add stack → **Repository**
 
-On first boot the web container will:
-- generate and persist `AUTH_SECRET`
-- generate an admin password, print it in the **web container logs**, and save it under `/app/data/admin_password`
+- Repository URL: `https://github.com/Outlaw1297/Flying-J-Premium-Beef`
+- Compose path: `docker-compose.yml`
+- Branch: `main`
+- Leave environment variables empty
 
-Default admin email: `admin@flyingjbeef.com`
+No secrets to type. After the stack is up, open the **web** container logs for:
 
-Optional later (when you can type more easily):
+```text
+email:    admin@flyingjbeef.com
+password: <generated>
+```
+
+The first start builds the site image on your server (several minutes). Portainer’s phone UI often hides the real error — if deploy fails, open the stack on a desktop browser or check the Portainer container log.
+
+Optional later:
 - `NEXTAUTH_URL=https://your-domain.example`
-- `SEED_ON_START=false` after first successful login
+- `SEED_ON_START=false` after you have signed in
+- `POSTGRES_PASSWORD` if you do not want the built-in default `flying_j_change_me`
 
 ### CLI
 

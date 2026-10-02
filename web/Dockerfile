@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # Multi-stage production image for personal-server / VPS hosting.
 
 FROM node:22-bookworm-slim AS base
@@ -28,7 +27,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-RUN groupadd --system --gid 1001 nodejs \
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends gosu \
+  && rm -rf /var/lib/apt/lists/* \
+  && groupadd --system --gid 1001 nodejs \
   && useradd --system --uid 1001 --gid nodejs nextjs
 
 COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/package-lock.json ./
@@ -51,10 +53,12 @@ RUN npm prune --omit=dev \
   && test -x node_modules/.bin/tsx \
   && test -x node_modules/.bin/prisma
 
-COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh \
+  && chown nextjs:nodejs /app/docker-entrypoint.sh
 
-USER nextjs
+# Start as root so the entrypoint can fix volume ownership, then drop to nextjs.
+USER root
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD curl -fsS "http://127.0.0.1:${PORT:-3000}/" >/dev/null || exit 1

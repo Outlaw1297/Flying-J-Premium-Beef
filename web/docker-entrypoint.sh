@@ -1,8 +1,20 @@
 #!/bin/sh
 set -eu
 
+# Named volumes are root-owned. Fix that, then continue as nextjs.
+if [ "$(id -u)" = "0" ]; then
+  mkdir -p /app/data /app/public/uploads/products
+  chown -R nextjs:nodejs /app/data /app/public/uploads
+  exec gosu nextjs:nodejs /app/docker-entrypoint.sh
+fi
+
 DATA_DIR="${DATA_DIR:-/app/data}"
 mkdir -p "$DATA_DIR"
+
+if [ -z "${DATABASE_URL:-}" ]; then
+  DATABASE_URL="postgresql://${POSTGRES_USER:-flying_j}:${POSTGRES_PASSWORD:-flying_j_change_me}@db:5432/${POSTGRES_DB:-flying_j_beef}"
+  export DATABASE_URL
+fi
 
 rand_secret() {
   node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64'))"
