@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { CouponType, PrismaClient, UserRole } from "../src/generated/prisma/client";
 import { hash } from "bcryptjs";
@@ -155,10 +156,14 @@ async function main() {
   console.log("Seed complete.");
 
   if (process.env.STRIPE_SECRET_KEY) {
-    const { syncAllProductsToStripe } = await import("../src/lib/stripe-products");
-    const result = await syncAllProductsToStripe();
-    console.log(`Stripe catalog sync: ${result.synced} ok, ${result.failed} failed`);
-    for (const err of result.errors) console.error(" -", err);
+    try {
+      const { syncAllProductsToStripe } = await import("../src/lib/stripe-products");
+      const result = await syncAllProductsToStripe();
+      console.log(`Stripe catalog sync: ${result.synced} ok, ${result.failed} failed`);
+      for (const err of result.errors) console.error(" -", err);
+    } catch (error) {
+      console.error("Stripe catalog sync skipped:", error);
+    }
   } else {
     console.log("STRIPE_SECRET_KEY not set — skipped Stripe product sync");
   }

@@ -1,6 +1,28 @@
 #!/bin/sh
 set -eu
 
+# Compose passes the password separately. Reserved characters (@ : / # %) are
+# percent-encoded here so they are not parsed as part of the URI.
+if [ -z "${DATABASE_URL:-}" ]; then
+  DATABASE_URL="$(node <<'NODE'
+const user = process.env.POSTGRES_USER || "flying_j";
+const password = process.env.POSTGRES_PASSWORD ?? "";
+const database = process.env.POSTGRES_DB || "flying_j_beef";
+const host = process.env.POSTGRES_HOST || "db";
+const port = process.env.POSTGRES_PORT || "5432";
+const enc = encodeURIComponent;
+process.stdout.write(
+  `postgresql://${enc(user)}:${enc(password)}@${host}:${port}/${enc(database)}?schema=public`,
+);
+NODE
+)"
+  export DATABASE_URL
+  # `docker compose exec` does not inherit this shell export. Persist the
+  # encoded URL for Prisma and seed, which load /app/.env.
+  printf 'DATABASE_URL="%s"\n' "$DATABASE_URL" > /app/.env
+  chmod 600 /app/.env
+fi
+
 echo "Waiting for database..."
 node <<'NODE'
 const { Client } = require("pg");

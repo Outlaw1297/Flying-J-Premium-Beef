@@ -33,7 +33,8 @@ cp .env.docker.example .env
 #   AUTH_SECRET / NEXTAUTH_SECRET  → openssl rand -base64 32
 #   NEXTAUTH_URL                   → https://your-domain.example
 #   SEED_ADMIN_PASSWORD            → strong admin password
-#   POSTGRES_PASSWORD              → strong DB password
+#   SEED_ON_START                  → true for the first boot only, then false
+#   POSTGRES_PASSWORD              → strong DB password (may include @ : / # %)
 #   Stripe / email keys as needed
 
 docker compose up -d --build
@@ -41,8 +42,9 @@ docker compose up -d --build
 
 - App: `http://localhost:3000` (or your `NEXTAUTH_URL` behind a reverse proxy)
 - Admin: `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` from `.env`
-- First boot runs migrations + seed when `SEED_ON_START=true`
-- After first successful login, set `SEED_ON_START=false` in `.env` and run `docker compose up -d` again
+- Migrations run on every start. Seed runs only when `SEED_ON_START=true` (default is false)
+- Set `SEED_ON_START=true` for the first boot to create the catalog and admin, then set it back to `false` so later restarts do not overwrite prices, inventory, or the admin password
+- `NEXTAUTH_URL`, `NEXT_PUBLIC_CRISP_WEBSITE_ID`, and `NEXT_PUBLIC_SENTRY_DSN` are baked in at image build. After changing them, run `docker compose up -d --build` again
 
 Useful commands:
 

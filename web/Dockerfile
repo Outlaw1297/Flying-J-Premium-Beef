@@ -20,6 +20,13 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="postgresql://build:build@127.0.0.1:5432/build?schema=public"
+# Inlined into the client bundle and static metadata. Compose passes build args.
+ARG NEXTAUTH_URL=http://localhost:3000
+ARG NEXT_PUBLIC_CRISP_WEBSITE_ID
+ARG NEXT_PUBLIC_SENTRY_DSN
+ENV NEXTAUTH_URL=$NEXTAUTH_URL
+ENV NEXT_PUBLIC_CRISP_WEBSITE_ID=$NEXT_PUBLIC_CRISP_WEBSITE_ID
+ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
 RUN npm run build
 
 FROM base AS runner
@@ -29,7 +36,8 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
 RUN groupadd --system --gid 1001 nodejs \
-  && useradd --system --uid 1001 --gid nodejs nextjs
+  && useradd --system --uid 1001 --gid nodejs --create-home --home-dir /home/nextjs nextjs \
+  && install -d -m 755 -o nextjs -g nodejs /home/nextjs
 
 COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/package-lock.json ./
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
@@ -52,8 +60,13 @@ RUN npm prune --omit=dev \
   && test -x node_modules/.bin/prisma
 
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh \
+  && touch /app/.env \
+  && chown nextjs:nodejs /app/.env \
+  && chmod 600 /app/.env
 
+# npm/npx write a cache under HOME. useradd --system does not create it unless asked.
+ENV HOME=/home/nextjs
 USER nextjs
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
