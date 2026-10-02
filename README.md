@@ -28,21 +28,38 @@ Open [http://localhost:3000](http://localhost:3000).
 Requires Docker Engine + Docker Compose v2.
 
 ```bash
-cp .env.docker.example .env
-# Edit .env:
-#   AUTH_SECRET / NEXTAUTH_SECRET  → openssl rand -base64 32
-#   NEXTAUTH_URL                   → https://your-domain.example
-#   SEED_ADMIN_PASSWORD            → strong admin password
-#   POSTGRES_PASSWORD              → strong DB password
-#   Stripe / email keys as needed
-
+chmod +x scripts/docker-init-env.sh
+./scripts/docker-init-env.sh
+# Edit .env — set NEXTAUTH_URL to your public URL if not localhost
 docker compose up -d --build
 ```
 
+Or manually:
+
+```bash
+cp .env.docker.example .env
+# AUTH_SECRET and NEXTAUTH_SECRET must be non-empty (openssl rand -base64 32)
+# Also set SEED_ADMIN_PASSWORD, POSTGRES_PASSWORD, NEXTAUTH_URL
+docker compose up -d --build
+```
+
+### Portainer / “Deploy stack”
+
+Compose interpolation needs these **stack environment variables** set in the UI (or a `.env` next to the compose file). Empty `AUTH_SECRET=` causes deploy to fail.
+
+| Variable | Example |
+|---|---|
+| `AUTH_SECRET` | output of `openssl rand -base64 32` |
+| `NEXTAUTH_SECRET` | same value as `AUTH_SECRET` |
+| `POSTGRES_PASSWORD` | strong DB password |
+| `SEED_ADMIN_PASSWORD` | admin login password |
+| `NEXTAUTH_URL` | `https://your-domain.example` |
+| `SEED_ON_START` | `true` (first boot), then `false` |
+
 - App: `http://localhost:3000` (or your `NEXTAUTH_URL` behind a reverse proxy)
-- Admin: `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` from `.env`
+- Admin: `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`
 - First boot runs migrations + seed when `SEED_ON_START=true`
-- After first successful login, set `SEED_ON_START=false` in `.env` and run `docker compose up -d` again
+- After first successful login, set `SEED_ON_START=false` and redeploy/recreate `web`
 
 Useful commands:
 

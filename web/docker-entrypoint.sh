@@ -1,6 +1,18 @@
 #!/bin/sh
 set -eu
 
+if [ -z "${AUTH_SECRET:-}" ]; then
+  echo "ERROR: AUTH_SECRET is required."
+  echo "Set it in your .env file, or in Portainer → Stack → Environment variables."
+  echo "Generate one with:  openssl rand -base64 32"
+  exit 1
+fi
+
+# Allow setting only AUTH_SECRET; mirror it for Auth.js if NEXTAUTH_SECRET is blank
+if [ -z "${NEXTAUTH_SECRET:-}" ]; then
+  export NEXTAUTH_SECRET="$AUTH_SECRET"
+fi
+
 echo "Waiting for database..."
 node <<'NODE'
 const { Client } = require("pg");
