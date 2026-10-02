@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // Smaller production image for Docker / self-hosting
+  output: "standalone",
   // Allow product photo uploads through server actions (~2.5 MB images)
   experimental: {
     serverActions: {

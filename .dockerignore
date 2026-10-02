@@ -1,0 +1,4 @@
+# Local env for Docker Compose (do not commit)
+.env
+.env.local
+.env.*.local

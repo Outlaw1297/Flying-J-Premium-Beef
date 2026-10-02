@@ -4,6 +4,7 @@ E-commerce system for a local federally inspected premium beef business.
 
 - **[PLAN.md](./PLAN.md)** — Full execution plan
 - **[web/](./web/)** — Next.js application
+- **[docker-compose.yml](./docker-compose.yml)** — Self-host on a personal server / VPS
 
 ## Quick start (local)
 
@@ -21,6 +22,40 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000).
 
 **Seed admin (local dev only):** `admin@flyingjbeef.com` / `changeme123`
+
+## Self-host with Docker (personal server)
+
+Requires Docker Engine + Docker Compose v2.
+
+```bash
+cp .env.docker.example .env
+# Edit .env:
+#   AUTH_SECRET / NEXTAUTH_SECRET  → openssl rand -base64 32
+#   NEXTAUTH_URL                   → https://your-domain.example
+#   SEED_ADMIN_PASSWORD            → strong admin password
+#   POSTGRES_PASSWORD              → strong DB password
+#   Stripe / email keys as needed
+
+docker compose up -d --build
+```
+
+- App: `http://localhost:3000` (or your `NEXTAUTH_URL` behind a reverse proxy)
+- Admin: `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` from `.env`
+- First boot runs migrations + seed when `SEED_ON_START=true`
+- After first successful login, set `SEED_ON_START=false` in `.env` and run `docker compose up -d` again
+
+Useful commands:
+
+```bash
+docker compose logs -f web
+docker compose exec web npm run db:seed          # re-seed / reset admin password
+docker compose exec web npm run db:sync-stripe   # if Stripe keys are set
+docker compose down                              # stop (keeps DB + uploads volumes)
+```
+
+Product uploads persist in the `uploads_data` volume. Postgres data persists in `postgres_data`.
+
+Put a reverse proxy (Caddy / nginx / Traefik) in front for HTTPS and point Stripe webhooks at `https://your-domain/api/stripe/webhook`.
 
 ## Deploy on Render
 

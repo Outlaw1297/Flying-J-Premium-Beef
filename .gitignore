@@ -1,0 +1,6 @@
+# Root secrets / local Docker env
+.env
+.env.local
+.env.*.local
+!.env.docker.example
+!.env.example
