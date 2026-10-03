@@ -49,6 +49,7 @@ services:
       SEED_ON_START: "${SEED_ON_START:-true}"
       SEED_ADMIN_EMAIL: "${SEED_ADMIN_EMAIL:-admin@flyingjbeef.com}"
       SEED_ADMIN_PASSWORD: "${SEED_ADMIN_PASSWORD:-}"
+      # Optional. Prefer Admin → Payments, which stores keys in the database.
       STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY:-}"
       STRIPE_PUBLISHABLE_KEY: "${STRIPE_PUBLISHABLE_KEY:-}"
       STRIPE_WEBHOOK_SECRET: "${STRIPE_WEBHOOK_SECRET:-}"

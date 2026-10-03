@@ -78,6 +78,8 @@ Product uploads persist in the `uploads_data` volume. Postgres data persists in 
 
 Put a reverse proxy (Caddy / nginx / Traefik) in front for HTTPS and point Stripe webhooks at `https://your-domain/api/stripe/webhook`.
 
+Stripe keys are saved in the admin site, not in Portainer. Sign in, open **Payments** (`/admin/payments`), and paste the secret key, publishable key, and webhook signing secret. Leave a field blank to keep the key already saved.
+
 ## Deploy on Render
 
 1. Push this repo to GitHub.
@@ -124,7 +126,7 @@ In [Stripe Dashboard → Webhooks](https://dashboard.stripe.com/test/webhooks), 
 
 Event: `checkout.session.completed`
 
-Copy the signing secret into Render as `STRIPE_WEBHOOK_SECRET`.
+Copy the signing secret into Admin → Payments, or set `STRIPE_WEBHOOK_SECRET` on the host.
 
 ## Phase 1 status (foundation)
 

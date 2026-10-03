@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getStripe } from "@/lib/stripe";
+import { getStripe, getStripeSecretKey } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import type { Coupon, CouponType, Prisma } from "@/generated/prisma/client";
 import { CouponType as CouponTypeEnum } from "@/generated/prisma/enums";
@@ -111,7 +111,7 @@ export async function resolveAppliedCoupon(
 
 /** Create matching Stripe Coupon + Promotion Code; returns promo id. */
 export async function syncCouponToStripe(coupon: Coupon): Promise<string | null> {
-  if (!process.env.STRIPE_SECRET_KEY) return null;
+  if (!(await getStripeSecretKey())) return null;
 
   if (coupon.stripePromotionCodeId) {
     return coupon.stripePromotionCodeId;
@@ -123,7 +123,7 @@ export async function syncCouponToStripe(coupon: Coupon): Promise<string | null>
     return fresh.stripePromotionCodeId;
   }
 
-  const stripe = getStripe();
+  const stripe = await getStripe();
 
   const stripeCoupon =
     coupon.type === CouponTypeEnum.PERCENT
@@ -163,8 +163,8 @@ export async function setStripePromotionActive(
   stripePromotionCodeId: string | null | undefined,
   active: boolean,
 ): Promise<void> {
-  if (!stripePromotionCodeId || !process.env.STRIPE_SECRET_KEY) return;
-  const stripe = getStripe();
+  if (!stripePromotionCodeId || !(await getStripeSecretKey())) return;
+  const stripe = await getStripe();
   await stripe.promotionCodes.update(stripePromotionCodeId, { active });
 }
 

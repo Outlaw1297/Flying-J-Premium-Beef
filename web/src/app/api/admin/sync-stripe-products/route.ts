@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { syncAllProductsToStripe } from "@/lib/stripe-products";
+import { getStripeSecretKey } from "@/lib/stripe";
 
 export async function POST() {
   const session = await auth();
@@ -8,9 +9,9 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!(await getStripeSecretKey())) {
     return NextResponse.json(
-      { error: "STRIPE_SECRET_KEY is not configured" },
+      { error: "Add Stripe keys under Admin → Payments" },
       { status: 500 },
     );
   }

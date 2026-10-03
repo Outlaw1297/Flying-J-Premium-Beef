@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ClearCartOnSuccess } from "@/components/checkout/clear-cart-on-success";
 import { formatCents } from "@/lib/format";
-import { getStripe } from "@/lib/stripe";
+import { getStripe, getStripeSecretKey } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { fulfillCheckoutSession } from "@/lib/orders";
 import { auth } from "@/lib/auth";
@@ -48,9 +48,9 @@ export default async function CheckoutSuccessPage({
   let isDeferred = deferredParam === "1";
   let invoiceId: string | null = invoiceIdParam ?? null;
 
-  if (sessionId && process.env.STRIPE_SECRET_KEY) {
+  if (sessionId && (await getStripeSecretKey())) {
     try {
-      const stripe = getStripe();
+      const stripe = await getStripe();
       const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);
 
       if (checkoutSession.payment_status === "paid") {

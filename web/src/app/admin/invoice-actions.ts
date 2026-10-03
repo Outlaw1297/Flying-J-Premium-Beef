@@ -10,7 +10,7 @@ import {
   recalculateInvoiceTotals,
 } from "@/lib/invoices";
 import { sendInvoiceIssuedEmail } from "@/lib/email";
-import { getAppUrl, getStripe } from "@/lib/stripe";
+import { getAppUrl, getStripe, getStripeSecretKey } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 
 export type InvoiceFormState = { error?: string; success?: string };
@@ -233,11 +233,11 @@ export async function payInvoiceAction(
     return { error: "This invoice is not open for payment" };
   }
   if (invoice.totalCents <= 0) return { error: "Nothing due on this invoice" };
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return { error: "Card payments are not configured" };
+  if (!(await getStripeSecretKey())) {
+    return { error: "Card payments are not configured. Add keys under Admin → Payments." };
   }
 
-  const stripe = getStripe();
+  const stripe = await getStripe();
   const appUrl = getAppUrl();
 
   const customer = await stripe.customers.create({

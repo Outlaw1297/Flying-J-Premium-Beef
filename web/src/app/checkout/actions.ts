@@ -13,7 +13,7 @@ import {
 } from "@/lib/coupons";
 import { createOrderConfirmToken } from "@/lib/guest-tokens";
 import { subscribeToNewsletter } from "@/lib/newsletter";
-import { getAppUrl, getStripe } from "@/lib/stripe";
+import { getAppUrl, getStripe, getStripeSecretKey } from "@/lib/stripe";
 import {
   buildInvoiceLinesFromCart,
   nextInvoiceNumber,
@@ -499,10 +499,10 @@ export async function createCheckoutSessionAction(
   }
 
   // Card — Stripe Checkout with automatic tax
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!(await getStripeSecretKey())) {
     return {
       error:
-        "Card payments are not configured yet. Choose cash or check, or add STRIPE_SECRET_KEY in Render.",
+        "Card payments are not configured yet. Choose cash or check, or add Stripe keys under Admin → Payments.",
     };
   }
 
@@ -513,7 +513,7 @@ export async function createCheckoutSessionAction(
     },
   });
 
-  const stripe = getStripe();
+  const stripe = await getStripe();
   const appUrl = getAppUrl();
   const taxAddress = taxResolved.address;
 

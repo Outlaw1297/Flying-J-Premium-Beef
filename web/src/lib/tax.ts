@@ -1,4 +1,4 @@
-import { getStripe } from "@/lib/stripe";
+import { getStripe, getStripeSecretKey } from "@/lib/stripe";
 import type { CartItem } from "@/lib/cart";
 import {
   DEFAULT_PRODUCT_TAX_CODE,
@@ -105,7 +105,7 @@ export async function calculateSalesTax(input: {
   );
   const subtotalCents = rawSubtotal - discountCents;
 
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!(await getStripeSecretKey())) {
     return {
       subtotalCents: rawSubtotal,
       taxCents: 0,
@@ -115,7 +115,7 @@ export async function calculateSalesTax(input: {
     };
   }
 
-  const stripe = getStripe();
+  const stripe = await getStripe();
 
   // Scale line items so Stripe Tax computes on the discounted subtotal
   const scale =

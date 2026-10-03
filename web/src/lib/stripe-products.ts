@@ -1,4 +1,4 @@
-import { getStripe } from "@/lib/stripe";
+import { getStripe, getStripeSecretKey } from "@/lib/stripe";
 import { resolveProductTaxCode } from "@/lib/stripe-tax-codes";
 import { prisma } from "@/lib/prisma";
 import { isHttpImageUrl } from "@/lib/product-images";
@@ -27,11 +27,11 @@ type SyncableProduct = Pick<
 export async function syncProductToStripe(
   product: SyncableProduct,
 ): Promise<{ stripeProductId: string; stripePriceId: string }> {
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!(await getStripeSecretKey())) {
     throw new Error("STRIPE_SECRET_KEY is not configured");
   }
 
-  const stripe = getStripe();
+  const stripe = await getStripe();
   const taxCode = resolveProductTaxCode(product.stripeTaxCode);
 
   let stripeProductId = product.stripeProductId;
@@ -128,7 +128,7 @@ export async function ensureProductSynced(productId: string): Promise<string | n
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) return null;
 
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!(await getStripeSecretKey())) {
     return product.stripePriceId;
   }
 

@@ -295,6 +295,14 @@ model SupportTicket {
   @@map("support_tickets")
 }
 
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
+
 model SupportMessage {
   id         String     @id @default(cuid())
   ticketId   String     @map("ticket_id")

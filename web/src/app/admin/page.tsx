@@ -179,6 +179,11 @@ export default async function AdminDashboardPage() {
                 </Link>
               </li>
               <li>
+                <Link href="/admin/payments" className="text-copper hover:underline">
+                  Stripe API keys
+                </Link>
+              </li>
+              <li>
                 <Link href="/admin/coupons" className="text-copper hover:underline">
                   Create coupon
                 </Link>
