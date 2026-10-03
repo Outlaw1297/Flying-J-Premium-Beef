@@ -49,7 +49,7 @@ password: (generated value in the log)
 
 Optional later:
 
-- `NEXTAUTH_URL=https://your-domain.example`
+- `NEXTAUTH_URL` and `AUTH_URL` default to `https://beef.flyingjranch.me` so sign-in stays on that host
 - `SEED_ON_START=false` after you have signed in
 - `POSTGRES_PASSWORD` if you do not want the built-in default `flying_j_change_me`
 
