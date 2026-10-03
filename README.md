@@ -61,7 +61,7 @@ chmod +x scripts/docker-init-env.sh
 docker compose up -d --build
 ```
 
-- App: `http://localhost:3000` (or your `NEXTAUTH_URL` behind a reverse proxy)
+- App: `http://localhost:8090` (or your `NEXTAUTH_URL` behind a reverse proxy). Host port 3000 is left free because it is often already in use.
 - First boot runs migrations + seed when `SEED_ON_START=true` (default)
 - After first successful login, set `SEED_ON_START=false` and redeploy/recreate `web`
 
