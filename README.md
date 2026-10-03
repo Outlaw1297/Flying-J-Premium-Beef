@@ -29,10 +29,17 @@ Requires Docker Engine + Docker Compose v2.
 
 ### Zero-config (Portainer / mobile)
 
-The stack pulls a ready-made image. It does not build on your server.
+The stack downloads a ready-made image. It does not build on your server.
+
+The image is private until you make it public (one time):
+
+1. Open the package settings: https://github.com/Outlaw1297/Flying-J-Premium-Beef/pkgs/container/flying-j-premium-beef/settings
+2. Change package visibility to **Public**.
+
+Then in Portainer:
 
 1. Delete the failed stack if it is still listed.
-2. Add a stack. Paste `docker-compose.yml` from `main`, or use the Git repository.
+2. Add a stack from `main` (`docker-compose.yml`). Paste the file, or use the Git repository.
 3. Leave environment variables empty and deploy.
 
 Repository settings, if you use Git instead of paste:
