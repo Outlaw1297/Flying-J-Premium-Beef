@@ -1,10 +1,13 @@
 # Flying J Premium Beef — self-host with Docker Compose / Portainer
 #
-# Portainer (mobile) — Web editor or Repository, no build on the server:
-#   Image: ghcr.io/outlaw1297/flying-j-premium-beef:latest
-#   Compose path (if using Git): docker-compose.yml
+# Portainer: deploy from the Git repository (not a pasted compose file).
+#   URL: https://github.com/Outlaw1297/Flying-J-Premium-Beef
+#   Compose path: docker-compose.yml
 #   Branch: main
 #   No environment variables required.
+#
+# The web image is built on your server from this repo. Do not pull
+# ghcr.io — that package is private and Portainer will get "unauthorized".
 #
 # After deploy, open the web container logs for the admin password.
 # Optional later: NEXTAUTH_URL=https://your-domain.example
@@ -26,7 +29,9 @@ services:
       retries: 10
 
   web:
-    image: ghcr.io/outlaw1297/flying-j-premium-beef:latest
+    build:
+      context: ./web
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       - db

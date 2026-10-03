@@ -29,25 +29,16 @@ Requires Docker Engine + Docker Compose v2.
 
 ### Zero-config (Portainer / mobile)
 
-The stack downloads a ready-made image. It does not build on your server.
+Deploy from the **Git repository**. Pasting only the compose file fails, and the GitHub image is private, so Portainer cannot download it (`unauthorized`).
 
-The image is private until you make it public (one time):
+1. Delete the failed stack.
+2. Add stack → Repository.
+3. URL: `https://github.com/Outlaw1297/Flying-J-Premium-Beef`
+4. Compose path: `docker-compose.yml`
+5. Branch: `refs/heads/main` (or `main`)
+6. Leave environment variables empty and deploy.
 
-1. Open the package settings: https://github.com/Outlaw1297/Flying-J-Premium-Beef/pkgs/container/flying-j-premium-beef/settings
-2. Change package visibility to **Public**.
-
-Then in Portainer:
-
-1. Delete the failed stack if it is still listed.
-2. Add a stack from `main` (`docker-compose.yml`). Paste the file, or use the Git repository.
-3. Leave environment variables empty and deploy.
-
-Repository settings, if you use Git instead of paste:
-
-- URL: `https://github.com/Outlaw1297/Flying-J-Premium-Beef`
-- Compose path: `docker-compose.yml`
-- Branch: `main`
-- The repo is private, so Portainer needs a GitHub personal access token with repo read access.
+The repo is private, so Portainer needs a GitHub token that can read the repo. The first deploy builds the site on your server and can take several minutes. When the **web** container is running, its logs show the admin login.
 
 After the **web** container is running, open its logs:
 
@@ -67,8 +58,7 @@ Optional later:
 ```bash
 chmod +x scripts/docker-init-env.sh
 ./scripts/docker-init-env.sh   # optional — pre-writes secrets into .env
-docker compose pull
-docker compose up -d
+docker compose up -d --build
 ```
 
 - App: `http://localhost:3000` (or your `NEXTAUTH_URL` behind a reverse proxy)
