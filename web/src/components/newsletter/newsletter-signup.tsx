@@ -11,24 +11,27 @@ const initialState: NewsletterFormState = {};
 export function NewsletterSignup({
   source = "FOOTER",
   compact = false,
+  idSuffix,
 }: {
   source?: "FOOTER" | "CHECKOUT" | "POPUP" | "ACCOUNT";
   compact?: boolean;
+  idSuffix?: string;
 }) {
   const [state, formAction, pending] = useActionState(
     subscribeNewsletterAction,
     initialState,
   );
+  const inputId = `newsletter-email-${idSuffix ?? source}`;
 
   return (
     <form action={formAction} className={compact ? "space-y-2" : "space-y-3"}>
       <input type="hidden" name="source" value={source} />
       <div className={compact ? "flex flex-col gap-2 sm:flex-row" : "space-y-2"}>
-        <label htmlFor={`newsletter-email-${source}`} className="sr-only">
+        <label htmlFor={inputId} className="sr-only">
           Email
         </label>
         <input
-          id={`newsletter-email-${source}`}
+          id={inputId}
           name="email"
           type="email"
           required
