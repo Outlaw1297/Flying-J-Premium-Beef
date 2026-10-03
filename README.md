@@ -29,23 +29,28 @@ Requires Docker Engine + Docker Compose v2.
 
 ### Zero-config (Portainer / mobile)
 
-Stacks → Add stack → **Repository**
+The stack pulls a ready-made image. It does not build on your server.
 
-- Repository URL: `https://github.com/Outlaw1297/Flying-J-Premium-Beef`
+1. Delete the failed stack if it is still listed.
+2. Add a stack. Paste `docker-compose.yml` from `main`, or use the Git repository.
+3. Leave environment variables empty and deploy.
+
+Repository settings, if you use Git instead of paste:
+
+- URL: `https://github.com/Outlaw1297/Flying-J-Premium-Beef`
 - Compose path: `docker-compose.yml`
 - Branch: `main`
-- Leave environment variables empty
+- The repo is private, so Portainer needs a GitHub personal access token with repo read access.
 
-No secrets to type. After the stack is up, open the **web** container logs for:
+After the **web** container is running, open its logs:
 
 ```text
 email:    admin@flyingjbeef.com
-password: <generated>
+password: (generated value in the log)
 ```
 
-The first start builds the site image on your server (several minutes). Portainer’s phone UI often hides the real error — if deploy fails, open the stack on a desktop browser or check the Portainer container log.
-
 Optional later:
+
 - `NEXTAUTH_URL=https://your-domain.example`
 - `SEED_ON_START=false` after you have signed in
 - `POSTGRES_PASSWORD` if you do not want the built-in default `flying_j_change_me`
@@ -55,7 +60,8 @@ Optional later:
 ```bash
 chmod +x scripts/docker-init-env.sh
 ./scripts/docker-init-env.sh   # optional — pre-writes secrets into .env
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 - App: `http://localhost:3000` (or your `NEXTAUTH_URL` behind a reverse proxy)

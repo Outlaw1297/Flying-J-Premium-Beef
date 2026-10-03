@@ -1,9 +1,8 @@
 # Flying J Premium Beef — self-host with Docker Compose / Portainer
 #
-# Portainer (mobile):
-#   Stacks → Add stack → Repository
-#   URL: https://github.com/Outlaw1297/Flying-J-Premium-Beef
-#   Compose path: docker-compose.yml
+# Portainer (mobile) — Web editor or Repository, no build on the server:
+#   Image: ghcr.io/outlaw1297/flying-j-premium-beef:latest
+#   Compose path (if using Git): docker-compose.yml
 #   Branch: main
 #   No environment variables required.
 #
@@ -27,9 +26,7 @@ services:
       retries: 10
 
   web:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
+    image: ghcr.io/outlaw1297/flying-j-premium-beef:latest
     restart: unless-stopped
     depends_on:
       - db
