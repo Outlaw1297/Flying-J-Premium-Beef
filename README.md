@@ -38,7 +38,7 @@ Deploy from the **Git repository**. Pasting only the compose file fails, and the
 5. Branch: `refs/heads/main` (or `main`)
 6. Leave environment variables empty and deploy.
 
-The repo is private, so Portainer needs a GitHub token that can read the repo. The first deploy builds the site on your server and can take several minutes. When the **web** container is running, its logs show the admin login.
+The repo is private, so Portainer needs a GitHub token that can read the repo. The first deploy builds the site on your server and can take several minutes. Open the site at `http://your-server:8090`. When the **web** container is running, its logs show the admin login.
 
 After the **web** container is running, open its logs:
 
